@@ -500,6 +500,10 @@ zskiplistNode *zslLastInRange(zskiplist *zsl, zrangespec *range) {
  * Min and max are inclusive, so a score >= min || score <= max is deleted.
  * Note that this function takes the reference to the hash table view of the
  * sorted set, in order to remove the elements from the hash table too. */
+
+/**
+ * 从skiplist中删除所有min <= score <= max或min < score < max范围内的元素
+ */
 unsigned long zslDeleteRangeByScore(zskiplist *zsl, zrangespec *range, dict *dict) {
     zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;
     unsigned long removed = 0;
@@ -523,14 +527,19 @@ unsigned long zslDeleteRangeByScore(zskiplist *zsl, zrangespec *range, dict *dic
     {
         zskiplistNode *next = x->level[0].forward;
         zslDeleteNode(zsl,x,update);
+        //删除哈希表
         dictDelete(dict,x->ele);
         zslFreeNode(x); /* Here is where x->ele is actually released. */
         removed++;
         x = next;
     }
+    //返回删除的元素个数
     return removed;
 }
 
+/**
+ * 从skiplist删除字典区间范围内的元素
+ */
 unsigned long zslDeleteRangeByLex(zskiplist *zsl, zlexrangespec *range, dict *dict) {
     zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;
     unsigned long removed = 0;

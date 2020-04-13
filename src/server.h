@@ -1673,6 +1673,9 @@ int hasActiveChildProcess();
 #define ZADD_CH (1<<16)      /* Return num of elements added or updated. */
 
 /* Struct to hold a inclusive/exclusive range spec by score comparison. */
+/**
+ * 用于比较score的结构体
+ */
 typedef struct {
 	//最小值，最大值
     double min, max;
@@ -1681,6 +1684,9 @@ typedef struct {
 } zrangespec;
 
 /* Struct to hold an inclusive/exclusive range spec by lexicographic comparison. */
+/**
+ * 用于比较字典值的结构体
+ */
 typedef struct {
     sds min, max;     /* May be set to shared.(minstring|maxstring) */
     int minex, maxex; /* are min or max exclusive? */
