@@ -571,6 +571,9 @@ unsigned long zslDeleteRangeByLex(zskiplist *zsl, zlexrangespec *range, dict *di
 
 /* Delete all the elements with rank between start and end from the skiplist.
  * Start and end are inclusive. Note that start and end need to be 1-based */
+/**
+ * 从skiplist删除跨度区间范围内的元素（左开右闭）
+ */
 unsigned long zslDeleteRangeByRank(zskiplist *zsl, unsigned int start, unsigned int end, dict *dict) {
     zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;
     unsigned long traversed = 0, removed = 0;
@@ -603,6 +606,10 @@ unsigned long zslDeleteRangeByRank(zskiplist *zsl, unsigned int start, unsigned 
  * Returns 0 when the element cannot be found, rank otherwise.
  * Note that the rank is 1-based due to the span of zsl->header to the
  * first element. */
+/**
+ * 通score和key获取指定元素的排名
+ * 当元素未找到时返回0，否则返回排名
+ */
 unsigned long zslGetRank(zskiplist *zsl, double score, sds ele) {
     zskiplistNode *x;
     unsigned long rank = 0;
@@ -627,6 +634,9 @@ unsigned long zslGetRank(zskiplist *zsl, double score, sds ele) {
 }
 
 /* Finds an element by its rank. The rank argument needs to be 1-based. */
+/**
+ * 按排名查找元素。排名必须是基于1的。
+ */
 zskiplistNode* zslGetElementByRank(zskiplist *zsl, unsigned long rank) {
     zskiplistNode *x;
     unsigned long traversed = 0;
@@ -647,6 +657,9 @@ zskiplistNode* zslGetElementByRank(zskiplist *zsl, unsigned long rank) {
 }
 
 /* Populate the rangespec according to the objects min and max. */
+/**
+ * 填充rangespec
+ */
 static int zslParseRange(robj *min, robj *max, zrangespec *spec) {
     char *eptr;
     spec->minex = spec->maxex = 0;
@@ -655,6 +668,10 @@ static int zslParseRange(robj *min, robj *max, zrangespec *spec) {
      * by the "(" character, it's considered "open". For instance
      * ZRANGEBYSCORE zset (1.5 (2.5 will match min < x < max
      * ZRANGEBYSCORE zset 1.5 2.5 will instead match min <= x <= max */
+
+    /**
+     * 解析min-max间隔。如果有前缀”(“，认为是“开放的”。
+     */
     if (min->encoding == OBJ_ENCODING_INT) {
         spec->min = (long)min->ptr;
     } else {
@@ -698,6 +715,19 @@ static int zslParseRange(robj *min, robj *max, zrangespec *spec) {
   *
   * If the string is not a valid range C_ERR is returned, and the value
   * of *dest and *ex is undefined. */
+
+/**
+ * 解析用于ZRANGEBYLEX的max或min参数
+ * ( 表示开放
+ * [ 表示闭合
+ * - 表示可能的最小字符串
+ * + 表示可能的最大字符串
+ *
+ * 如果字符串合法，则dest指针指向用于比较的redis object，并且ex会对应的按照元素是包含还是排除被设置为0或者1。
+ * 函数返回C_OK。
+ *
+ * 如果字符串非法则返回C_ERR，并且*dest和*ex会是undefined的。
+ */
 int zslParseLexRangeItem(robj *item, sds *dest, int *ex) {
     char *c = item->ptr;
 
@@ -727,6 +757,10 @@ int zslParseLexRangeItem(robj *item, sds *dest, int *ex) {
 
 /* Free a lex range structure, must be called only after zelParseLexRange()
  * populated the structure with success (C_OK returned). */
+
+/**
+ * 释放用于比较字典值的结构体，当且仅当zelParseLexRange()函数填充结构体返回C_OK时才能被调用
+ */
 void zslFreeLexRange(zlexrangespec *spec) {
     if (spec->min != shared.minstring &&
         spec->min != shared.maxstring) sdsfree(spec->min);
@@ -739,6 +773,10 @@ void zslFreeLexRange(zlexrangespec *spec) {
  * Return C_OK on success. On error C_ERR is returned.
  * When OK is returned the structure must be freed with zslFreeLexRange(),
  * otherwise no release is needed. */
+
+/**
+ * 填充zlexrangespec
+ */
 int zslParseLexRange(robj *min, robj *max, zlexrangespec *spec) {
     /* The range can't be valid if objects are integer encoded.
      * Every item must start with ( or [. */
@@ -758,6 +796,10 @@ int zslParseLexRange(robj *min, robj *max, zlexrangespec *spec) {
 /* This is just a wrapper to sdscmp() that is able to
  * handle shared.minstring and shared.maxstring as the equivalent of
  * -inf and +inf for strings */
+
+/**
+ * sdscmp()函数的包装器，能够处理等同于-inf和+inf的shared.minstring and shared.maxstring。
+ */
 int sdscmplex(sds a, sds b) {
     if (a == b) return 0;
     if (a == shared.minstring || b == shared.maxstring) return -1;
@@ -765,12 +807,18 @@ int sdscmplex(sds a, sds b) {
     return sdscmp(a,b);
 }
 
+/**
+ * 判断字典值大于或大于等于最小值
+ */
 int zslLexValueGteMin(sds value, zlexrangespec *spec) {
     return spec->minex ?
         (sdscmplex(value,spec->min) > 0) :
         (sdscmplex(value,spec->min) >= 0);
 }
 
+/**
+ * 判断字典值小于或小于等于最大值
+ */
 int zslLexValueLteMax(sds value, zlexrangespec *spec) {
     return spec->maxex ?
         (sdscmplex(value,spec->max) < 0) :
@@ -778,6 +826,9 @@ int zslLexValueLteMax(sds value, zlexrangespec *spec) {
 }
 
 /* Returns if there is a part of the zset is in the lex range. */
+/**
+ * zskiplist是否有字典值在range范围内
+ */
 int zslIsInLexRange(zskiplist *zsl, zlexrangespec *range) {
     zskiplistNode *x;
 
@@ -796,6 +847,10 @@ int zslIsInLexRange(zskiplist *zsl, zlexrangespec *range) {
 
 /* Find the first node that is contained in the specified lex range.
  * Returns NULL when no element is contained in the range. */
+/**
+ * 返回zskiplist则在范围内的第一个节点。
+ * 没有元素在范围内则返回NULL
+ */
 zskiplistNode *zslFirstInLexRange(zskiplist *zsl, zlexrangespec *range) {
     zskiplistNode *x;
     int i;
@@ -822,6 +877,10 @@ zskiplistNode *zslFirstInLexRange(zskiplist *zsl, zlexrangespec *range) {
 
 /* Find the last node that is contained in the specified range.
  * Returns NULL when no element is contained in the range. */
+/**
+ * 返回zskiplist则在范围内的第最后一个节点。
+ * 没有元素在范围内则返回NULL
+ */
 zskiplistNode *zslLastInLexRange(zskiplist *zsl, zlexrangespec *range) {
     zskiplistNode *x;
     int i;

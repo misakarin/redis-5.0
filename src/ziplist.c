@@ -6,6 +6,10 @@
  * the memory used by the ziplist, the actual complexity is related to the
  * amount of memory used by the ziplist.
  *
+ * ziplist是为了节省内存而设计的特殊的双向链表。它储存字符串和整数，其中整数被编码真正的数字而不是
+ * 一串字符。它允许在链表两端以O(1)时间复杂度进行push和pop操作。然而，因为每个操作都需要重新分配内存，
+ * 实际的时间复杂度取决于ziplist所使用的内存。
+ *
  * ----------------------------------------------------------------------------
  *
  * ZIPLIST OVERALL LAYOUT
@@ -13,26 +17,42 @@
  *
  * The general layout of the ziplist is as follows:
  *
+ * ziplist的总体布局如下：
+ *
  * <zlbytes> <zltail> <zllen> <entry> <entry> ... <entry> <zlend>
  *
  * NOTE: all fields are stored in little endian, if not specified otherwise.
+ *
+ * 注意：所有的字段均以小端模式存储，除非特别指定。
  *
  * <uint32_t zlbytes> is an unsigned integer to hold the number of bytes that
  * the ziplist occupies, including the four bytes of the zlbytes field itself.
  * This value needs to be stored to be able to resize the entire structure
  * without the need to traverse it first.
  *
+ * <uint32_t zlbytes> 存储ziplist所占用的字节数的无符号整数，包含zlbytes自身的四个字节。
+ * 这个值需要被存储为了在调整结构的时候不需要遍历整个链表。
+ *
+ *
  * <uint32_t zltail> is the offset to the last entry in the list. This allows
  * a pop operation on the far side of the list without the need for full
  * traversal.
+ *
+ * <uint32_t zltail> 存储链表中最后一项的偏移量。它让链表远端的pop操作不需要遍历整个链表。
  *
  * <uint16_t zllen> is the number of entries. When there are more than
  * 2^16-2 entries, this value is set to 2^16-1 and we need to traverse the
  * entire list to know how many items it holds.
  *
+ *
+ * <uint16_t zllen> 存储链表中项的总数。当多于2^16-2项时，该值被设置为2^16-1，需要遍历
+ * 整个链表才能知道有多少项。
+ *
  * <uint8_t zlend> is a special entry representing the end of the ziplist.
  * Is encoded as a single byte equal to 255. No other normal entry starts
  * with a byte set to the value of 255.
+ *
+ * <uint8_t zlend> 是表示ziplist结尾的特殊的项。
  *
  * ZIPLIST ENTRIES
  * ===============
@@ -46,10 +66,19 @@
  *
  * <prevlen> <encoding> <entry-data>
  *
+ * ziplist中每一项都有包含两个信息的元数据作为前缀。首先是为了能从后向前遍历（而存储的）的前一项的长度。
+ * 然后是项的编码。它表示项的类型，整数或者是字符串，字符串的情况下它还表示字符串的有效长度。
+ * 所以一个完整的项像这样被组成：
+ *<prevlen> <encoding> <entry-data>
+ *
+ *
  * Sometimes the encoding represents the entry itself, like for small integers
  * as we'll see later. In such a case the <entry-data> part is missing, and we
  * could have just:
  *
+ * <prevlen> <encoding>
+ *
+ * 有时编码项就表示整个项，例如我们将要遇到的小整数。在这种情况下没有<entry-data>，仅有
  * <prevlen> <encoding>
  *
  * The length of the previous entry, <prevlen>, is encoded in the following way:
@@ -59,13 +88,23 @@
  * set to 254 (FE) to indicate a larger value is following. The remaining 4
  * bytes take the length of the previous entry as value.
  *
+ * 前一项的长度，<prevlen>，按以下方式编码：
+ * 如果长度小于254字节，它只用一个字节以无符号8位整数的方式表示长度。当长度大于或等于254，它使用5个字节。
+ * 第一个字节被设置为254（FE）来表示接下来是一个大数值。剩下的4个字节以前一项的长度作为值。
+ *
  * So practically an entry is encoded in the following way:
  *
+ * <prevlen from 0 to 253> <encoding> <entry>
+ *
+ * 所以基本上一个项通过以下方式编码：
  * <prevlen from 0 to 253> <encoding> <entry>
  *
  * Or alternatively if the previous entry length is greater than 253 bytes
  * the following encoding is used:
  *
+ * 0xFE <4 bytes unsigned little endian prevlen> <encoding> <entry>
+ *
+ * 或者当前一项长度大于253字节时使用以下的编码方式：
  * 0xFE <4 bytes unsigned little endian prevlen> <encoding> <entry>
  *
  * The encoding field of the entry depends on the content of the
@@ -77,36 +116,83 @@
  * different types and encodings is as follows. The first byte is always enough
  * to determine the kind of entry.
  *
+ * 项的编码字段取决于项的内容。当项是一个字符串时，编码第一个字节的前2位将保存用于存储字符串长度的编码类型，
+ * 后面跟着实际长度的字符串。当项是整数时，前2位都被设置为1。接下来的2位将用来指定这个头节点借来下将存储的整数类型。
+ * 不同类型和编码的概览如下。第一个字节总是能够确定项的类型。
+ *
+ *
  * |00pppppp| - 1 byte
  *      String value with length less than or equal to 63 bytes (6 bits).
  *      "pppppp" represents the unsigned 6 bit length.
+ *
+ *      长度小于或等于63字节的字符串。
+ *      "pppppp" 表示无符号的6位长度。
+ *
  * |01pppppp|qqqqqqqq| - 2 bytes
  *      String value with length less than or equal to 16383 bytes (14 bits).
  *      IMPORTANT: The 14 bit number is stored in big endian.
+ *
+ *      长度小于等于16383字节的字符串。
+ *      IMPORTANT：14位以大端顺序存储。
+ *
  * |10000000|qqqqqqqq|rrrrrrrr|ssssssss|tttttttt| - 5 bytes
  *      String value with length greater than or equal to 16384 bytes.
  *      Only the 4 bytes following the first byte represents the length
  *      up to 32^2-1. The 6 lower bits of the first byte are not used and
  *      are set to zero.
  *      IMPORTANT: The 32 bit number is stored in big endian.
+ *
+ *      长度大于或等于163984字节的字符串。
+ *      首个字节后的4个字节表示最大长度32^2-1。
+ *      首个字节的低6位没有使用被设置为0。
+ *      IMPORTANT: 32位数字以大端顺序存储。
+ *
+ *
  * |11000000| - 3 bytes
  *      Integer encoded as int16_t (2 bytes).
+ *
+ *      作为int16_t编码的整数（2个字节）。
+ *
  * |11010000| - 5 bytes
  *      Integer encoded as int32_t (4 bytes).
+ *
+ *      作为int32_t编码的整数（4个字节）。
+ *
  * |11100000| - 9 bytes
  *      Integer encoded as int64_t (8 bytes).
+ *
+ *      作为int64_t编码的整数（8个字节）。
+ *
  * |11110000| - 4 bytes
  *      Integer encoded as 24 bit signed (3 bytes).
+ *
+ *      作为24位有符号编码的整数（3个字节）。
+ *
  * |11111110| - 2 bytes
  *      Integer encoded as 8 bit signed (1 byte).
+ *
+ *      作为8位有符号编码的整数（1个字节）。
+ *
  * |1111xxxx| - (with xxxx between 0000 and 1101) immediate 4 bit integer.
+ *
+ * |1111xxxx| - (with xxxx between 0000 and 1101) 直接4位这个整数。
+ *
  *      Unsigned integer from 0 to 12. The encoded value is actually from
  *      1 to 13 because 0000 and 1111 can not be used, so 1 should be
  *      subtracted from the encoded 4 bit value to obtain the right value.
+ *
+ *      从0到12的无符号整数。编码值实际从1到13但是因为0000和1111不能被使用，所以4位编码数值要减去1
+ *      获取正确的数值。
+ *
+ *
  * |11111111| - End of ziplist special entry.
+ *
+ * |11111111| - ziplist结尾的特殊项。
  *
  * Like for the ziplist header, all the integers are represented in little
  * endian byte order, even when this code is compiled in big endian systems.
+ *
+ * 和ziplist的头部项一样，所有的整数以小端顺序表示，除非代码是在大端顺序的系统编译。
  *
  * EXAMPLES OF ACTUAL ZIPLISTS
  * ===========================
