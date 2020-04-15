@@ -296,6 +296,9 @@ void evictionPoolPopulate(int dbid, dict *sampledict, dict *keydict, struct evic
 /* Return the current time in minutes, just taking the least significant
  * 16 bits. The returned time is suitable to be stored as LDT (last decrement
  * time) for the LFU implementation. */
+/**
+ * 按分钟返回当前时间，仅使用最低有效16位。返回的时间适合作为LDT（最后减少时间）用于实现LFU。
+ */
 unsigned long LFUGetTimeInMinutes(void) {
     return (server.unixtime/60) & 65535;
 }

@@ -595,29 +595,77 @@ typedef struct RedisModuleDigest {
 /* Objects encoding. Some kind of objects like Strings and Hashes can be
  * internally represented in multiple ways. The 'encoding' field of the object
  * is set to one of this fields for this object. */
+/**
+ * 简单动态字符串
+ */
 #define OBJ_ENCODING_RAW 0     /* Raw representation */
+/**
+ * 整数
+ */
 #define OBJ_ENCODING_INT 1     /* Encoded as integer */
+/**
+ * 哈希表
+ */
 #define OBJ_ENCODING_HT 2      /* Encoded as hash table */
+/**
+ * 压缩表
+ */
 #define OBJ_ENCODING_ZIPMAP 3  /* Encoded as zipmap */
 #define OBJ_ENCODING_LINKEDLIST 4 /* No longer used: old list encoding. */
+/**
+ * 压缩列表
+ */
 #define OBJ_ENCODING_ZIPLIST 5 /* Encoded as ziplist */
+/**
+ * 整数集合
+ */
 #define OBJ_ENCODING_INTSET 6  /* Encoded as intset */
+/**
+ * 跳跃表
+ */
 #define OBJ_ENCODING_SKIPLIST 7  /* Encoded as skiplist */
+/**
+ * embstr编码的简单字符串
+ */
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
+/**
+ * 链表的压缩列表
+ */
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
+/**
+ *
+ */
 #define OBJ_ENCODING_STREAM 10 /* Encoded as a radix tree of listpacks */
 
 #define LRU_BITS 24
+/**
+ * LRU时钟最大值
+ */
 #define LRU_CLOCK_MAX ((1<<LRU_BITS)-1) /* Max value of obj->lru */
+/**
+ * LRU时钟分辨率，以毫秒为单位。
+ */
 #define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */
 
 #define OBJ_SHARED_REFCOUNT INT_MAX
 typedef struct redisObject {
+	/**
+	 *  :为C语言位字段
+	 */
     unsigned type:4;
     unsigned encoding:4;
     unsigned lru:LRU_BITS; /* LRU time (relative to global lru_clock) or
                             * LFU data (least significant 8 bits frequency
                             * and most significant 16 bits access time). */
+
+    						/**
+    						 *  lru 24位
+    						 *  LRU时间（相对于全局lru_clock)
+    						 *  或者是LFU数据（最低有效8位的访问频率和最高有效的16位访问时间）
+    						 */
+    /**
+     * 引用计数
+     */
     int refcount;
     void *ptr;
 } robj;
@@ -953,6 +1001,9 @@ struct redisServer {
     dict *commands;             /* Command table */
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
+    /**
+     * LRU过期时钟
+     */
     unsigned int lruclock;      /* Clock for LRU eviction */
     int shutdown_asap;          /* SHUTDOWN needed ASAP */
     int activerehashing;        /* Incremental rehash in serverCron() */
@@ -1201,6 +1252,9 @@ struct redisServer {
     /* Limits */
     unsigned int maxclients;            /* Max number of simultaneous clients */
     unsigned long long maxmemory;   /* Max number of memory bytes to use */
+    /**
+     * 过期策略
+     */
     int maxmemory_policy;           /* Policy for key eviction */
     int maxmemory_samples;          /* Pricision of random sampling */
     int lfu_log_factor;             /* LFU logarithmic counter factor. */
@@ -1944,6 +1998,9 @@ size_t getSlaveKeyWithExpireCount(void);
 
 /* evict.c -- maxmemory handling and LRU eviction. */
 void evictionPoolAlloc(void);
+/**
+ * LFU初始值
+ */
 #define LFU_INIT_VAL 5
 unsigned long LFUGetTimeInMinutes(void);
 uint8_t LFULogIncr(uint8_t value);

@@ -1157,6 +1157,9 @@ unsigned char *ziplistMerge(unsigned char **first, unsigned char **second) {
     return target;
 }
 
+/**
+ * 头部或尾部插入
+ */
 unsigned char *ziplistPush(unsigned char *zl, unsigned char *s, unsigned int slen, int where) {
     unsigned char *p;
     p = (where == ZIPLIST_HEAD) ? ZIPLIST_ENTRY_HEAD(zl) : ZIPLIST_ENTRY_END(zl);
@@ -1166,6 +1169,11 @@ unsigned char *ziplistPush(unsigned char *zl, unsigned char *s, unsigned int sle
 /* Returns an offset to use for iterating with ziplistNext. When the given
  * index is negative, the list is traversed back to front. When the list
  * doesn't contain an element at the provided index, NULL is returned. */
+
+/**
+ * 返回一个偏移量让ziplistNext()用于遍历。当index为负数时，从尾到头便利。当列表在index不存
+ * 在元素时，返回NULL。
+ */
 unsigned char *ziplistIndex(unsigned char *zl, int index) {
     unsigned char *p;
     unsigned int prevlensize, prevlen = 0;
@@ -1194,6 +1202,14 @@ unsigned char *ziplistIndex(unsigned char *zl, int index) {
  * p is the pointer to the current element
  *
  * The element after 'p' is returned, otherwise NULL if we are at the end. */
+
+/**
+ * 返回指向ziplist的下一个元素的指针。
+ *
+ * zl为指向ziplist的指针
+ * p为指向当前元素的指针
+ *
+ */
 unsigned char *ziplistNext(unsigned char *zl, unsigned char *p) {
     ((void) zl);
 
@@ -1213,6 +1229,10 @@ unsigned char *ziplistNext(unsigned char *zl, unsigned char *p) {
 }
 
 /* Return pointer to previous entry in ziplist. */
+
+/**
+ * 返回ziplist前一个元素。
+ */
 unsigned char *ziplistPrev(unsigned char *zl, unsigned char *p) {
     unsigned int prevlensize, prevlen = 0;
 
@@ -1235,18 +1255,27 @@ unsigned char *ziplistPrev(unsigned char *zl, unsigned char *p) {
  * on the encoding of the entry. '*sstr' is always set to NULL to be able
  * to find out whether the string pointer or the integer value was set.
  * Return 0 if 'p' points to the end of the ziplist, 1 otherwise. */
+
+/**
+ * 根据'p'指向元素的编码将数据存向'*sstr' 或者 'sval'，'*sstr'总是别设为NULL用于判断
+ * 字符串指针或者整数值是否被设置。
+ * 返回0当'p'指向ziplist的结尾，否则返回1。
+ */
 unsigned int ziplistGet(unsigned char *p, unsigned char **sstr, unsigned int *slen, long long *sval) {
     zlentry entry;
     if (p == NULL || p[0] == ZIP_END) return 0;
     if (sstr) *sstr = NULL;
 
     zipEntry(p, &entry);
+    //字符串
     if (ZIP_IS_STR(entry.encoding)) {
         if (sstr) {
             *slen = entry.len;
             *sstr = p+entry.headersize;
         }
-    } else {
+    }
+    //数字
+    else {
         if (sval) {
             *sval = zipLoadInteger(p+entry.headersize,entry.encoding);
         }
@@ -1262,6 +1291,10 @@ unsigned char *ziplistInsert(unsigned char *zl, unsigned char *p, unsigned char 
 /* Delete a single entry from the ziplist, pointed to by *p.
  * Also update *p in place, to be able to iterate over the
  * ziplist, while deleting entries. */
+
+/**
+ * 从指针p指向的ziplist删除一个元素。同时更新p的位置，为了能够遍历ziplist来删除元素。
+ */
 unsigned char *ziplistDelete(unsigned char *zl, unsigned char **p) {
     size_t offset = *p-zl;
     zl = __ziplistDelete(zl,*p,1);

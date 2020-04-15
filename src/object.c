@@ -48,8 +48,15 @@ robj *createObject(int type, void *ptr) {
     /* Set the LRU to the current lruclock (minutes resolution), or
      * alternatively the LFU counter. */
     if (server.maxmemory_policy & MAXMEMORY_FLAG_LFU) {
+    	/**LFU
+    	 * 访问时间在高16位
+    	 * 访问时间|初始值5
+    	 */
         o->lru = (LFUGetTimeInMinutes()<<8) | LFU_INIT_VAL;
     } else {
+    	/**
+    	 * LRU
+    	 */
         o->lru = LRU_CLOCK();
     }
     return o;
@@ -66,6 +73,11 @@ robj *createObject(int type, void *ptr) {
  * robj *myobject = makeObjectShared(createObject(...));
  *
  */
+/**
+ * 在对象中设置一个特殊的引用计数让它成为"被分享的":
+ * incrRefCount和decrRefCount()函数将检查这个特殊的引用值并且不会接触这个对象。
+ * 这种方式能够自由的从不同的线程获取类似一些小整数的分享对象而不需要任何互斥。
+ */
 robj *makeObjectShared(robj *o) {
     serverAssert(o->refcount == 1);
     o->refcount = OBJ_SHARED_REFCOUNT;
@@ -74,6 +86,9 @@ robj *makeObjectShared(robj *o) {
 
 /* Create a string object with encoding OBJ_ENCODING_RAW, that is a plain
  * string object where o->ptr points to a proper sds string. */
+/**
+ * 以OBJ_ENCODING_RAW编码创建一个o->ptr指针指向真正的sds字符串的简单字符串的字符串对象。
+ */
 robj *createRawStringObject(const char *ptr, size_t len) {
     return createObject(OBJ_STRING, sdsnewlen(ptr,len));
 }
@@ -81,6 +96,11 @@ robj *createRawStringObject(const char *ptr, size_t len) {
 /* Create a string object with encoding OBJ_ENCODING_EMBSTR, that is
  * an object where the sds string is actually an unmodifiable string
  * allocated in the same chunk as the object itself. */
+
+/**
+ * 以OBJ_ENCODING_EMBSTR编码创建一个字符串对象，该对象的sds字符串是一个不可修改的字符串且和
+ * 对象本身处于同一内存块内。
+ */
 robj *createEmbeddedStringObject(const char *ptr, size_t len) {
     robj *o = zmalloc(sizeof(robj)+sizeof(struct sdshdr8)+len+1);
     struct sdshdr8 *sh = (void*)(o+1);
