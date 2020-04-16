@@ -911,6 +911,10 @@ typedef struct redisOpArray {
 
 /* This structure is returned by the getMemoryOverheadData() function in
  * order to return memory overhead information. */
+
+/**
+ * 该结构体作为getMemoryOverheadData()的返回值用于返回内存开销信息。
+ */
 struct redisMemOverhead {
     size_t peak_allocated;
     size_t total_allocated;

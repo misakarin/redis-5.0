@@ -650,6 +650,14 @@ robj *getDecodedObject(robj *o) {
  * Important note: when REDIS_COMPARE_BINARY is used a binary-safe comparison
  * is used. */
 
+
+/**
+ *
+ * 根据flags通过strcmp()或者strcoll()比较两个字符串对象。
+ * 对象可能是整数编码的。这种情况下我们使用ll2string()在栈上获取数字的字符串表示然后比较字符串，
+ * 这样性能比调用getDecodedObject()快很多。
+ * int strcoll(const char *str1, const char *str2) 把 str1 和 str2 进行比较，结果取决于 LC_COLLATE 的位置设置
+ */
 #define REDIS_COMPARE_BINARY (1<<0)
 #define REDIS_COMPARE_COLL (1<<1)
 
@@ -1324,6 +1332,10 @@ sds getMemoryDoctorReport(void) {
  * The lru_idle and lru_clock args are only relevant if policy
  * is MAXMEMORY_FLAG_LRU.
  * Either or both of them may be <0, in that case, nothing is set. */
+
+/**
+ * 根据server.maxmemory_policy设置对象LRU/LFU。
+ */
 void objectSetLRUOrLFU(robj *val, long long lfu_freq, long long lru_idle,
                        long long lru_clock) {
     if (server.maxmemory_policy & MAXMEMORY_FLAG_LFU) {

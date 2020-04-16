@@ -68,12 +68,14 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
     long long milliseconds = 0; /* initialized to avoid any harmness warning */
 
     if (expire) {
+    	//将过期时间转换为long long
         if (getLongLongFromObjectOrReply(c, expire, &milliseconds, NULL) != C_OK)
             return;
         if (milliseconds <= 0) {
             addReplyErrorFormat(c,"invalid expire time in %s",c->cmd->name);
             return;
         }
+        //秒或毫秒
         if (unit == UNIT_SECONDS) milliseconds *= 1000;
     }
 
