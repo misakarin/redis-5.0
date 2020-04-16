@@ -131,7 +131,7 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
 
 /* Create a string object with EMBSTR encoding if it is smaller than
  * OBJ_ENCODING_EMBSTR_SIZE_LIMIT, otherwise the RAW encoding is
- * used.
+ * used.sharedObjectsStruct
  *
  * The current limit of 44 is chosen so that the biggest string object
  * we allocate as EMBSTR will still fit into the 64 byte arena of jemalloc. */
@@ -150,6 +150,12 @@ robj *createStringObject(const char *ptr, size_t len) {
  * integer, because the object is going to be used as value in the Redis key
  * space (for instance when the INCR command is used), so we want LFU/LRU
  * values specific for each key. */
+
+/**
+ * 从value创建一个字符串对象，如果可能则返回一个可共享的整数对象，否则返回一个编码整数对象。
+ * 如果valueobj不为0，该函数避免返回一个可共享整数，因为该对象将作为Redis key来使用（例如
+ * 使用INCR命令时）,所以我们希望每个key的LFU/LRU值是被指定的。
+ */
 robj *createStringObjectFromLongLongWithOptions(long long value, int valueobj) {
     robj *o;
 
@@ -157,7 +163,11 @@ robj *createStringObjectFromLongLongWithOptions(long long value, int valueobj) {
         !(server.maxmemory_policy & MAXMEMORY_FLAG_NO_SHARED_INTEGERS))
     {
         /* If the maxmemory policy permits, we can still return shared integers
-         * even if valueobj is true. */
+         * even if valueobj is trueOBJ_ENCODING_EMBSTR_SIZE_LIMIT. */
+
+    	/**
+    	 * 如果允许最大内存策略，即使valueobj为真我们仍然返回一个可共享整数。
+    	 */
         valueobj = 0;
     }
 
@@ -178,6 +188,10 @@ robj *createStringObjectFromLongLongWithOptions(long long value, int valueobj) {
 
 /* Wrapper for createStringObjectFromLongLongWithOptions() always demanding
  * to create a shared object if possible. */
+/**
+ * createStringObjectFromLongLongWithOptions()函数的封装，总是尽可能创建一个
+ * 可共享对象。
+ */
 robj *createStringObjectFromLongLong(long long value) {
     return createStringObjectFromLongLongWithOptions(value,0);
 }
@@ -186,6 +200,11 @@ robj *createStringObjectFromLongLong(long long value) {
  * object when LFU/LRU info are needed, that is, when the object is used
  * as a value in the key space, and Redis is configured to evict based on
  * LFU/LRU. */
+
+/**
+ * createStringObjectFromLongLongWithOptions()函数的封装，用于需要LFU/LRU信息时避免返回
+ * 一个可分享的对象，这种情况是对象作为key来使用，并且Redis被配置位根据LFU/LRU来进行淘汰。
+ */
 robj *createStringObjectFromLongLongForValue(long long value) {
     return createStringObjectFromLongLongWithOptions(value,1);
 }
@@ -196,6 +215,13 @@ robj *createStringObjectFromLongLongForValue(long long value) {
  * and the output of snprintf() is not modified.
  *
  * The 'humanfriendly' option is used for INCRBYFLOAT and HINCRBYFLOAT. */
+
+/**
+ * 从long double返回一个字符串对象。如果humanfriendly为非0，函数将不使用指数格式和去除
+ * 末尾的0，返回丢失精度的结果。否则使用指数格式并且snprintf()的输出是没有被修改的。
+ *
+ * 'humanfriendly'选项用于INCRBYFLOAT和HINCRBYFLOAT。
+ */
 robj *createStringObjectFromLongDouble(long double value, int humanfriendly) {
     char buf[MAX_LONG_DOUBLE_CHARS];
     int len = ld2string(buf,sizeof(buf),value,humanfriendly);
@@ -210,6 +236,12 @@ robj *createStringObjectFromLongDouble(long double value, int humanfriendly) {
  * will always result in a fresh object that is unshared (refcount == 1).
  *
  * The resulting object always has refcount set to 1. */
+
+/**
+ * 复制一个字符串对象，保证返回的对象和原始对象有一样的编码。
+ *
+ * 该函数同时保证复制一个小整数对象（或者是表示小整数的字符串对象）总是产生一个未被共享的新的对象（refcount==1)。
+ */
 robj *dupStringObject(const robj *o) {
     robj *d;
 
@@ -231,6 +263,9 @@ robj *dupStringObject(const robj *o) {
     }
 }
 
+/**
+ * 创建以quicklist实现的list
+ */
 robj *createQuicklistObject(void) {
     quicklist *l = quicklistCreate();
     robj *o = createObject(OBJ_LIST,l);
@@ -238,6 +273,9 @@ robj *createQuicklistObject(void) {
     return o;
 }
 
+/**
+ * 创建以ziplist实现的list
+ */
 robj *createZiplistObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_LIST,zl);
@@ -245,6 +283,9 @@ robj *createZiplistObject(void) {
     return o;
 }
 
+/**
+ * 创建set
+ */
 robj *createSetObject(void) {
     dict *d = dictCreate(&setDictType,NULL);
     robj *o = createObject(OBJ_SET,d);
@@ -252,6 +293,9 @@ robj *createSetObject(void) {
     return o;
 }
 
+/**
+ * 创建以intset实现的set
+ */
 robj *createIntsetObject(void) {
     intset *is = intsetNew();
     robj *o = createObject(OBJ_SET,is);
@@ -259,6 +303,9 @@ robj *createIntsetObject(void) {
     return o;
 }
 
+/**
+ * 创建以ziplist实现的hash
+ */
 robj *createHashObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_HASH, zl);
@@ -266,6 +313,9 @@ robj *createHashObject(void) {
     return o;
 }
 
+/**
+ * 创建以skiplist实现的zset
+ */
 robj *createZsetObject(void) {
     zset *zs = zmalloc(sizeof(*zs));
     robj *o;
@@ -277,6 +327,9 @@ robj *createZsetObject(void) {
     return o;
 }
 
+/**
+ * 创建以ziplist实现的zset
+ */
 robj *createZsetZiplistObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_ZSET,zl);
@@ -366,11 +419,18 @@ void freeStreamObject(robj *o) {
     freeStream(o->ptr);
 }
 
+/**
+ * 增加引用计数
+ */
 void incrRefCount(robj *o) {
     if (o->refcount != OBJ_SHARED_REFCOUNT) o->refcount++;
 }
 
+/**
+ * 减少引用计数
+ */
 void decrRefCount(robj *o) {
+	//直接释放
     if (o->refcount == 1) {
         switch(o->type) {
         case OBJ_STRING: freeStringObject(o); break;
@@ -448,6 +508,10 @@ void trimStringObjectIfNeeded(robj *o) {
 }
 
 /* Try to encode a string object in order to save space */
+
+/**
+ * 编码一个字符串对象用于节省空间。
+ */
 robj *tryObjectEncoding(robj *o) {
     long value;
     sds s = o->ptr;
@@ -457,16 +521,28 @@ robj *tryObjectEncoding(robj *o) {
      * in this function. Other types use encoded memory efficient
      * representations but are handled by the commands implementing
      * the type. */
+
+    /**
+     * 该方法只编码字符串对象类型。该方法其他类型内存高效表现通过命令实现来处理。
+     */
     serverAssertWithInfo(NULL,o,o->type == OBJ_STRING);
 
     /* We try some specialized encoding only for objects that are
      * RAW or EMBSTR encoded, in other words objects that are still
      * in represented by an actually array of chars. */
+
+    /**
+     * 只处理字符串编码的对象
+     */
     if (!sdsEncodedObject(o)) return o;
 
     /* It's not safe to encode shared objects: shared objects can be shared
      * everywhere in the "object space" of Redis and may end in places where
      * they are not handled. We handle them only as values in the keyspace. */
+
+    /**
+     * 只处理非共享对象
+     */
      if (o->refcount > 1) return o;
 
     /* Check if we can represent this string as a long integer.
@@ -478,6 +554,14 @@ robj *tryObjectEncoding(robj *o) {
          * Note that we avoid using shared integers when maxmemory is used
          * because every object needs to have a private LRU field for the LRU
          * algorithm to work well. */
+
+    	/**
+    	 * 该对象被编为long。尝试使用一个共享对象。
+    	 * 注意当使用最大内存策略时我们避免使用共享整数因为每个对象需要有私有的LRU字段使
+    	 * LRU算法能正确工作。
+    	 */
+
+    	//使用共享对象
         if ((server.maxmemory == 0 ||
             !(server.maxmemory_policy & MAXMEMORY_FLAG_NO_SHARED_INTEGERS)) &&
             value >= 0 &&
@@ -486,7 +570,9 @@ robj *tryObjectEncoding(robj *o) {
             decrRefCount(o);
             incrRefCount(shared.integers[value]);
             return shared.integers[value];
-        } else {
+        }
+        //不使用共享对象
+        else {
             if (o->encoding == OBJ_ENCODING_RAW) {
                 sdsfree(o->ptr);
                 o->encoding = OBJ_ENCODING_INT;
@@ -503,6 +589,10 @@ robj *tryObjectEncoding(robj *o) {
      * try the EMBSTR encoding which is more efficient.
      * In this representation the object and the SDS string are allocated
      * in the same chunk of memory to save space and cache misses. */
+
+    /**
+     * 尝试编码为EMBSTR
+     */
     if (len <= OBJ_ENCODING_EMBSTR_SIZE_LIMIT) {
         robj *emb;
 
@@ -529,6 +619,11 @@ robj *tryObjectEncoding(robj *o) {
 
 /* Get a decoded version of an encoded object (returned as a new object).
  * If the object is already raw-encoded just increment the ref count. */
+
+/**
+ * 获取一个编码对象的解码版本（返回一个新对象）。
+ * 如果对象已经是raw编码的则仅仅更新引用计数。
+ */
 robj *getDecodedObject(robj *o) {
     robj *dec;
 

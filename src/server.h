@@ -1251,6 +1251,9 @@ struct redisServer {
     int get_ack_from_slaves;            /* If true we send REPLCONF GETACK. */
     /* Limits */
     unsigned int maxclients;            /* Max number of simultaneous clients */
+    /**
+     * 最大可用内存字节数
+     */
     unsigned long long maxmemory;   /* Max number of memory bytes to use */
     /**
      * 过期策略
