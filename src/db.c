@@ -149,6 +149,10 @@ robj *lookupKeyRead(redisDb *db, robj *key) {
  *
  * Returns the linked value object if the key exists or NULL if the key
  * does not exist in the specified DB. */
+
+/**
+ * 查找用于写操作的key，而且作为副作用，如果需要，使到达TTL的key失效。
+ */
 robj *lookupKeyWrite(redisDb *db, robj *key) {
     expireIfNeeded(db,key);
     return lookupKey(db,key,LOOKUP_NONE);
@@ -186,6 +190,12 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
  * This function does not modify the expire time of the existing key.
  *
  * The program is aborted if the key was not already present. */
+
+/**
+ * 用一个新值覆盖已存在key的值。根据调用方增加 新值的引用计数。
+ * 该函数不修改key的过期时间。
+ * 如果key不存在程序将终止。
+ */
 void dbOverwrite(redisDb *db, robj *key, robj *val) {
     dictEntry *de = dictFind(db->dict,key->ptr);
 

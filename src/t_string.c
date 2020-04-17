@@ -183,6 +183,9 @@ void getsetCommand(client *c) {
     server.dirty++;
 }
 
+/**
+ * Redis Setrange 命令用指定的字符串覆盖给定 key 所储存的字符串值，覆盖的位置从偏移量 offset 开始。
+ */
 void setrangeCommand(client *c) {
     robj *o;
     long offset;
@@ -312,6 +315,10 @@ void msetGenericCommand(client *c, int nx) {
 
     /* Handle the NX flag. The MSETNX semantic is to return zero and don't
      * set anything if at least one key alerady exists. */
+
+    /**
+     * 处理NX标记。如果至少有一个key存在MSETNX语义返回0且不进行任何操作。
+     */
     if (nx) {
         for (j = 1; j < c->argc; j += 2) {
             if (lookupKeyWrite(c->db,c->argv[j]) != NULL) {
@@ -343,10 +350,19 @@ void incrDecrCommand(client *c, long long incr) {
     robj *o, *new;
 
     o = lookupKeyWrite(c->db,c->argv[1]);
+    /**
+     * 如果key存在但是不是OBJ_STRING则返回
+     */
     if (o != NULL && checkType(c,o,OBJ_STRING)) return;
+    /**
+     * 如果不能转换成long long,则返回
+     */
     if (getLongLongFromObjectOrReply(c,o,&value,NULL) != C_OK) return;
 
     oldvalue = value;
+    /**
+     * incr溢出
+     */
     if ((incr < 0 && oldvalue < 0 && incr < (LLONG_MIN-oldvalue)) ||
         (incr > 0 && oldvalue > 0 && incr > (LLONG_MAX-oldvalue))) {
         addReplyError(c,"increment or decrement would overflow");
@@ -354,6 +370,9 @@ void incrDecrCommand(client *c, long long incr) {
     }
     value += incr;
 
+    /**
+     * 整数编码且不是共享对象
+     */
     if (o && o->refcount == 1 && o->encoding == OBJ_ENCODING_INT &&
         (value < 0 || value >= OBJ_SHARED_INTEGERS) &&
         value >= LONG_MIN && value <= LONG_MAX)
@@ -361,6 +380,7 @@ void incrDecrCommand(client *c, long long incr) {
         new = o;
         o->ptr = (void*)((long)value);
     } else {
+    	//尝试创建一个共享对象
         new = createStringObjectFromLongLongForValue(value);
         if (o) {
             dbOverwrite(c->db,c->argv[1],new);
@@ -426,6 +446,11 @@ void incrbyfloatCommand(client *c) {
     /* Always replicate INCRBYFLOAT as a SET command with the final value
      * in order to make sure that differences in float precision or formatting
      * will not create differences in replicas or after an AOF restart. */
+
+    /**
+     * 总是复制INCRBYFLOAT成SET命令和最终值为了保证不同的浮点数京都或者格式不会在
+     * 副本和AOF重启后造成差异。
+     */
     aux = createStringObject("SET",3);
     rewriteClientCommandArgument(c,0,aux);
     decrRefCount(aux);
@@ -451,6 +476,7 @@ void appendCommand(client *c) {
         /* "append" is an argument, so always an sds */
         append = c->argv[2];
         totlen = stringObjectLen(o)+sdslen(append->ptr);
+        //检查长度
         if (checkStringLength(c,totlen) != C_OK)
             return;
 

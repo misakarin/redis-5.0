@@ -629,7 +629,7 @@ typedef struct RedisModuleDigest {
  */
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
 /**
- * 链表的压缩列表
+ * 压缩列表实现的链表
  */
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
 /**

@@ -41,6 +41,13 @@
  * recompress: 1 bit, bool, true if node is temporarry decompressed for usage.
  * attempted_compress: 1 bit, boolean, used for verifying during testing.
  * extra: 10 bits, free for future use; pads out the remainder of 32 bits */
+
+/**
+ * 节点，快速列表和迭代器是当前唯一使用的数据结构。
+ * quicklistNode是一个32字节的结构，为quicklist描述了一个ziplsit。
+ *
+ *
+ */
 typedef struct quicklistNode {
     struct quicklistNode *prev;
     struct quicklistNode *next;
@@ -75,7 +82,14 @@ typedef struct quicklist {
     quicklistNode *tail;
     unsigned long count;        /* total count of all entries in all ziplists */
     unsigned long len;          /* number of quicklistNodes */
+    /**
+     * 单个节点的填充因子
+     * 整数表示数量，负数表示字节大小
+     */
     int fill : 16;              /* fill factor for individual nodes */
+    /**
+     * 端节点不被压缩的深度
+     */
     unsigned int compress : 16; /* depth of end nodes not to compress;0=off */
 } quicklist;
 
