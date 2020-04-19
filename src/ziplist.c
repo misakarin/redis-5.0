@@ -1293,7 +1293,7 @@ unsigned char *ziplistInsert(unsigned char *zl, unsigned char *p, unsigned char 
  * ziplist, while deleting entries. */
 
 /**
- * 从指针p指向的ziplist删除一个元素。同时更新p的位置，为了能够遍历ziplist来删除元素。
+ * 从ziplist中删除指针p指向的一个元素。同时更新p的位置，为了能够遍历ziplist来删除元素。
  */
 unsigned char *ziplistDelete(unsigned char *zl, unsigned char **p) {
     size_t offset = *p-zl;

@@ -176,6 +176,9 @@ void listTypeDelete(listTypeIterator *iter, listTypeEntry *entry) {
 }
 
 /* Create a quicklist from a single ziplist */
+/**
+ * 从一个ziplist创建quicklist
+ */
 void listTypeConvert(robj *subject, int enc) {
     serverAssertWithInfo(NULL,subject,subject->type==OBJ_LIST);
     serverAssertWithInfo(NULL,subject,subject->encoding==OBJ_ENCODING_ZIPLIST);
@@ -231,6 +234,9 @@ void rpushCommand(client *c) {
     pushGenericCommand(c,LIST_TAIL);
 }
 
+/**
+ * 插入到已存在的list中
+ */
 void pushxGenericCommand(client *c, int where) {
     int j, pushed = 0;
     robj *subject;
@@ -261,6 +267,10 @@ void rpushxCommand(client *c) {
     pushxGenericCommand(c,LIST_TAIL);
 }
 
+/**
+ * LINSERT key BEFORE|AFTER pivot value
+ * linsert命令用于在列表的元素前或者后插入元素。当指定元素不存在于列表中时，不执行任何操作。
+ */
 void linsertCommand(client *c) {
     int where;
     robj *subject;
