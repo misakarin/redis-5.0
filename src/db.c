@@ -38,11 +38,19 @@
  * C-level DB API
  *----------------------------------------------------------------------------*/
 
+/**
+ * key是否过期
+ */
 int keyIsExpired(redisDb *db, robj *key);
 
 /* Update LFU when an object is accessed.
  * Firstly, decrement the counter if the decrement time is reached.
  * Then logarithmically increment the counter, and update the access time. */
+/**
+ * 一个对象被访问时更新它的LFU。
+ * 首先，如果到达decrement time则减少计数。
+ * 然后逻辑增加计数，并更新访问时间。
+ */
 void updateLFU(robj *val) {
     unsigned long counter = LFUDecrAndReturn(val);
     counter = LFULogIncr(counter);
@@ -60,6 +68,10 @@ robj *lookupKey(redisDb *db, robj *key, int flags) {
         /* Update the access time for the ageing algorithm.
          * Don't do it if we have a saving child, as this will trigger
          * a copy on write madness. */
+        /**
+         * 通过老化算法更新访问时间。
+         * 当有一个执行保存操作的子进程时不进行此操作，因为会造成写时复制的悲剧。
+         */
         if (server.rdb_child_pid == -1 &&
             server.aof_child_pid == -1 &&
             !(flags & LOOKUP_NOTOUCH))
@@ -79,24 +91,41 @@ robj *lookupKey(redisDb *db, robj *key, int flags) {
 /* Lookup a key for read operations, or return NULL if the key is not found
  * in the specified DB.
  *
+ * 为读操作寻找key，如果在指定的DB找不到key则返回NULL。
+ *
  * As a side effect of calling this function:
  * 1. A key gets expired if it reached it's TTL.
  * 2. The key last access time is updated.
  * 3. The global keys hits/misses stats are updated (reported in INFO).
+ *
+ * 调用该函数有以下副作用：
+ * 1.过期key如果到达TTL。
+ * 2.更新key的最后访问时间。
+ * 3.全局key的命中状态被更新（返回在INFO命令的结果）
  *
  * This API should not be used when we write to the key after obtaining
  * the object linked to the key, but only for read only operations.
  *
  * Flags change the behavior of this command:
  *
+ *
  *  LOOKUP_NONE (or zero): no special flags are passed.
  *  LOOKUP_NOTOUCH: don't alter the last access time of the key.
+ *
+ *  LOOKUP_NONE (or zero): 非特殊标志
+ *  LOOKUP_NOTOUCH: 不修改key的最后访问时间
  *
  * Note: this function also returns NULL if the key is logically expired
  * but still existing, in case this is a slave, since this API is called only
  * for read operations. Even if the key expiry is master-driven, we can
  * correctly report a key is expired on slaves even if the master is lagging
- * expiring our key via DELs in the replication link. */
+ * expiring our key via DELs in the replication link.
+ *
+ * 注意：如果键在逻辑上已过期但仍然存在，则此函数还返回NULL，这种情况是该API在slave上被
+ * 读操作调用。即使key的过期是由master驱动的，master在复制链接中通过DEL命令过期key存在
+ * 延迟，哦们也能正确的包裹在slave上key已经过期。
+ *
+ * */
 robj *lookupKeyReadWithFlags(redisDb *db, robj *key, int flags) {
     robj *val;
 

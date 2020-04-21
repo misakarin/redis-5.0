@@ -75,6 +75,12 @@ unsigned int getLRUClock(void) {
  * If the current resolution is lower than the frequency we refresh the
  * LRU clock (as it should be in production servers) we return the
  * precomputed value, otherwise we need to resort to a system call. */
+
+/**
+ * 该函数用于获取当前的LRU时钟。
+ * 如果时钟的分辨率低于我们刷新LRU时钟的频率则返回一个预先计算的值，否则我们
+ * 需要进行一个系统调用。
+ */
 unsigned int LRU_CLOCK(void) {
     unsigned int lruclock;
     if (1000/server.hz <= LRU_CLOCK_RESOLUTION) {

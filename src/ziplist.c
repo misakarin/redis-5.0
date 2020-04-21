@@ -1171,7 +1171,7 @@ unsigned char *ziplistPush(unsigned char *zl, unsigned char *s, unsigned int sle
  * doesn't contain an element at the provided index, NULL is returned. */
 
 /**
- * 返回一个偏移量让ziplistNext()用于遍历。当index为负数时，从尾到头便利。当列表在index不存
+ * 返回一个偏移量让ziplistNext()用于遍历。当index为负数时，从尾到头遍历。当列表在index不存
  * 在元素时，返回NULL。
  */
 unsigned char *ziplistIndex(unsigned char *zl, int index) {
@@ -1342,6 +1342,10 @@ unsigned int ziplistCompare(unsigned char *p, unsigned char *sstr, unsigned int 
 
 /* Find pointer to the entry equal to the specified entry. Skip 'skip' entries
  * between every comparison. Returns NULL when the field could not be found. */
+
+/**
+ * 寻找指向指定项的指针。每次比较跳过'skip'个项。找不到则返回NULL。
+ */
 unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int vlen, unsigned int skip) {
     int skipcnt = 0;
     unsigned char vencoding = 0;
@@ -1357,6 +1361,9 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
 
         if (skipcnt == 0) {
             /* Compare current entry with specified entry */
+        	/**
+        	 * 比较当前项和指定项
+        	 */
             if (ZIP_IS_STR(encoding)) {
                 if (len == vlen && memcmp(q, vstr, vlen) == 0) {
                     return p;
@@ -1365,11 +1372,21 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
                 /* Find out if the searched field can be encoded. Note that
                  * we do it only the first time, once done vencoding is set
                  * to non-zero and vll is set to the integer value. */
+
+            	/**
+            	 * 找出搜索字段是否可以被编码。我们只在第一次进行这个判断，一旦完成vencoding
+            	 * 被设置成非零而且vll被设置成整数值。
+            	 */
                 if (vencoding == 0) {
                     if (!zipTryEncoding(vstr, vlen, &vll, &vencoding)) {
                         /* If the entry can't be encoded we set it to
                          * UCHAR_MAX so that we don't retry again the next
                          * time. */
+
+                    	/**
+                    	 * 如果entry不能被编码我们就它设置为UCHAR_MAX这样我们就不会
+                    	 * 在下一次继续尝试。
+                    	 */
                         vencoding = UCHAR_MAX;
                     }
                     /* Must be non-zero by now */

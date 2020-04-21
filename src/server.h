@@ -694,13 +694,21 @@ typedef struct clientReplyBlock {
  * by integers from 0 (the default database) up to the max configured
  * database. The database number is the 'id' field in the structure. */
 typedef struct redisDb {
+	//数据库的键空间
     dict *dict;                 /* The keyspace for this DB */
-    dict *expires;              /* Timeout of keys with a timeout set */
+    //设置了超时时间的key
+    dict *expires;             /* Timeout of keys with a timeout set */
+    //客户端等待数据的key
     dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP)*/
+    //收到数据的blocked key
     dict *ready_keys;           /* Blocked keys that received a PUSH */
+    //用于MULTI/EXEC CAS的key
     dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
+    //数据库ID
     int id;                     /* Database ID */
+    //平均TTL
     long long avg_ttl;          /* Average TTL, just for stats */
+    //尝试数据整理的key的list
     list *defrag_later;         /* List of key names to attempt to defrag one by one, gradually. */
 } redisDb;
 
@@ -1045,6 +1053,9 @@ struct redisServer {
     list *clients_pending_write; /* There is to write or install handler. */
     list *slaves, *monitors;    /* List of slaves and MONITORs */
     client *current_client;     /* Current client executing the command. */
+    /**
+     * 如果>0，通过server.mstime过期键。
+     */
     long fixed_time_expire;     /* If > 0, expire keys against server.mstime. */
     rax *clients_index;         /* Active clients dictionary by client ID. */
     int clients_paused;         /* True if clients are currently paused */
@@ -1163,6 +1174,9 @@ struct redisServer {
     /* RDB persistence */
     long long dirty;                /* Changes to DB from the last save */
     long long dirty_before_bgsave;  /* Used to restore dirty on failed BGSAVE */
+    /**
+     * 执行RDB的子进程ID
+     */
     pid_t rdb_child_pid;            /* PID of RDB saving child */
     struct saveparam *saveparams;   /* Save points array for RDB */
     int saveparamslen;              /* Number of saving points */

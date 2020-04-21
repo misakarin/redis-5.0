@@ -37,6 +37,10 @@
 /* Check the length of a number of objects to see if we need to convert a
  * ziplist to a real hash. Note that we only check string encoded objects
  * as their string length can be queried in constant time. */
+
+/**
+ * 检察多个对象，是否需要将ziplist转换成一个真正的哈希表。
+ */
 void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
     int i;
 
@@ -54,6 +58,11 @@ void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
 
 /* Get the value from a ziplist encoded hash, identified by field.
  * Returns -1 when the field cannot be found. */
+
+/**
+ * 从以字段标识的ziplist编码的哈希值中获取值。
+ * 字段找不到使返回-1。
+ */
 int hashTypeGetFromZiplist(robj *o, sds field,
                            unsigned char **vstr,
                            unsigned int *vlen,
@@ -67,6 +76,9 @@ int hashTypeGetFromZiplist(robj *o, sds field,
     zl = o->ptr;
     fptr = ziplistIndex(zl, ZIPLIST_HEAD);
     if (fptr != NULL) {
+    	/**
+    	 * 每次跳过1项，因为hash是key-value格式的。
+    	 */
         fptr = ziplistFind(fptr, (unsigned char*)field, sdslen(field), 1);
         if (fptr != NULL) {
             /* Grab pointer to the value (fptr points to the field) */
@@ -87,6 +99,11 @@ int hashTypeGetFromZiplist(robj *o, sds field,
 /* Get the value from a hash table encoded hash, identified by field.
  * Returns NULL when the field cannot be found, otherwise the SDS value
  * is returned. */
+
+/**
+ * 从以字段标识的哈希表编码的哈希值中获取值。
+ * 如果字段未被找到则返回NULL，发偶则返回SDS。
+ */
 sds hashTypeGetFromHashTable(robj *o, sds field) {
     dictEntry *de;
 
@@ -106,6 +123,15 @@ sds hashTypeGetFromHashTable(robj *o, sds field) {
  * If *vll is populated *vstr is set to NULL, so the caller
  * can always check the function return by checking the return value
  * for C_OK and checking if vll (or vstr) is NULL. */
+
+/**
+ * 高层次的hashTypeGet*()返回和指定字段关联的值。如果值被找到返回C_OK，否则返回C_ERR。
+ * 返回对象如果是字符串通过* vstr和* vlen中的引用返回，如果是数字则存储到*vll。
+ *
+ * 如果*vll被填充则*vstr被设置为NULL，所以调用者总是可以通过检查函数的返回值C_OK和检查
+ * vll(或者vstr)是否为NULL来检查函数。
+ *
+ */
 int hashTypeGetValue(robj *o, sds field, unsigned char **vstr, unsigned int *vlen, long long *vll) {
     if (o->encoding == OBJ_ENCODING_ZIPLIST) {
         *vstr = NULL;
@@ -128,6 +154,12 @@ int hashTypeGetValue(robj *o, sds field, unsigned char **vstr, unsigned int *vle
  * interaction with the hash type outside t_hash.c.
  * The function returns NULL if the field is not found in the hash. Otherwise
  * a newly allocated string object with the value is returned. */
+
+/**
+ * 和hashTypeGetValue()类似但是返回一个Redis对象，在t_hash.c之外通过hash类型进行遍历时
+ * 很有用。
+ * 该函数返回NULL如果字段没有在hash中被找到。否则返回一个包含值的新的string对象。
+ */
 robj *hashTypeGetValueObject(robj *o, sds field) {
     unsigned char *vstr;
     unsigned int vlen;
@@ -141,6 +173,10 @@ robj *hashTypeGetValueObject(robj *o, sds field) {
 /* Higher level function using hashTypeGet*() to return the length of the
  * object associated with the requested field, or 0 if the field does not
  * exist. */
+
+/**
+ * 高层次的方法使用hashTypeGet*()函数返回被请求字段关边的对象的长度，或者字段不存在时返回0。
+ */
 size_t hashTypeGetValueLength(robj *o, sds field) {
     size_t len = 0;
     if (o->encoding == OBJ_ENCODING_ZIPLIST) {
@@ -163,6 +199,10 @@ size_t hashTypeGetValueLength(robj *o, sds field) {
 
 /* Test if the specified field exists in the given hash. Returns 1 if the field
  * exists, and 0 when it doesn't. */
+
+/**
+ * 判断指定字段是否在hash中存在。
+ */
 int hashTypeExists(robj *o, sds field) {
     if (o->encoding == OBJ_ENCODING_ZIPLIST) {
         unsigned char *vstr = NULL;
@@ -185,8 +225,14 @@ int hashTypeExists(robj *o, sds field) {
  * caller retains ownership of the strings passed. However this behavior
  * can be effected by passing appropriate flags (possibly bitwise OR-ed):
  *
+ * 默认情况，如果需要key和value的SDS字符串会被复制，所以调用者保留被传递的字符串的所有权。
+ * 但是这个行为可以通过传递适当的标志位来改变。
+ *
  * HASH_SET_TAKE_FIELD -- The SDS field ownership passes to the function.
  * HASH_SET_TAKE_VALUE -- The SDS value ownership passes to the function.
+ *
+ * HASH_SET_TAKE_FIELD -- field的SDS的所有权传递给函数。
+ * HASH_SET_TAKE_VALUE -- value的SDS的所有权传递给函数。
  *
  * When the flags are used the caller does not need to release the passed
  * SDS string(s). It's up to the function to use the string to create a new
@@ -211,6 +257,9 @@ int hashTypeSet(robj *o, sds field, sds value, int flags) {
             fptr = ziplistFind(fptr, (unsigned char*)field, sdslen(field), 1);
             if (fptr != NULL) {
                 /* Grab pointer to the value (fptr points to the field) */
+            	/**
+            	 * key已存在，更新value
+            	 */
                 vptr = ziplistNext(zl, fptr);
                 serverAssert(vptr != NULL);
                 update = 1;
@@ -224,6 +273,9 @@ int hashTypeSet(robj *o, sds field, sds value, int flags) {
             }
         }
 
+        /**
+         * 插入新key-value对
+         */
         if (!update) {
             /* Push new field/value pair onto the tail of the ziplist */
             zl = ziplistPush(zl, (unsigned char*)field, sdslen(field),
@@ -231,9 +283,13 @@ int hashTypeSet(robj *o, sds field, sds value, int flags) {
             zl = ziplistPush(zl, (unsigned char*)value, sdslen(value),
                     ZIPLIST_TAIL);
         }
+        //更新指针
         o->ptr = zl;
 
         /* Check if the ziplist needs to be converted to a hash table */
+        /**
+         * 判断ziplist是否需要转换成hash table
+         */
         if (hashTypeLength(o) > server.hash_max_ziplist_entries)
             hashTypeConvert(o, OBJ_ENCODING_HT);
     } else if (o->encoding == OBJ_ENCODING_HT) {
@@ -513,6 +569,7 @@ void hashTypeConvert(robj *o, int enc) {
 
 void hsetnxCommand(client *c) {
     robj *o;
+    //判断hash table是否存在
     if ((o = hashTypeLookupWriteOrCreate(c,c->argv[1])) == NULL) return;
     hashTypeTryConversion(o,c->argv,2,3);
 
