@@ -778,8 +778,11 @@ typedef struct readyList {
 /* With multiplexing we need to take per-client state.
  * Clients are taken in a linked list. */
 typedef struct client {
+	//client自增ID
     uint64_t id;            /* Client incremental unique ID. */
+    //socket自增描述符
     int fd;                 /* Client socket. */
+    //指向当前选择db的指针
     redisDb *db;            /* Pointer to currently SELECTed DB. */
     robj *name;             /* As set by CLIENT SETNAME. */
     sds querybuf;           /* Buffer we use to accumulate client queries. */

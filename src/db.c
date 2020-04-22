@@ -123,7 +123,7 @@ robj *lookupKey(redisDb *db, robj *key, int flags) {
  *
  * 注意：如果键在逻辑上已过期但仍然存在，则此函数还返回NULL，这种情况是该API在slave上被
  * 读操作调用。即使key的过期是由master驱动的，master在复制链接中通过DEL命令过期key存在
- * 延迟，哦们也能正确的包裹在slave上key已经过期。
+ * 延迟，我们也能正确的反馈在slave上key已经过期。
  *
  * */
 robj *lookupKeyReadWithFlags(redisDb *db, robj *key, int flags) {
@@ -184,6 +184,7 @@ robj *lookupKeyRead(redisDb *db, robj *key) {
  */
 robj *lookupKeyWrite(redisDb *db, robj *key) {
     expireIfNeeded(db,key);
+	//只有主才能写
     return lookupKey(db,key,LOOKUP_NONE);
 }
 
@@ -221,7 +222,7 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
  * The program is aborted if the key was not already present. */
 
 /**
- * 用一个新值覆盖已存在key的值。根据调用方增加 新值的引用计数。
+ * 用一个新值覆盖已存在key的值。根据调用方增加新值的引用计数。
  * 该函数不修改key的过期时间。
  * 如果key不存在程序将终止。
  */
@@ -252,6 +253,14 @@ void dbOverwrite(redisDb *db, robj *key, robj *val) {
  * 3) The expire time of the key is reset (the key is made persistent).
  *
  * All the new keys in the database should be created via this interface. */
+
+/**
+ * 高层级的设置操作。该函数可被用于将一个新对象设置为key,无论是否已存在。
+ *
+ * 1) value对象的引用计数将增加。
+ * 2) 发送key被修改的消息
+ * 3) 过期时间被重置
+ */
 void setKey(redisDb *db, robj *key, robj *val) {
     if (lookupKeyWrite(db,key) == NULL) {
         dbAdd(db,key,val);
@@ -271,6 +280,11 @@ int dbExists(redisDb *db, robj *key) {
  * If there are no keys, NULL is returned.
  *
  * The function makes sure to return keys not already expired. */
+
+/**
+ * 以Redis object的形式随机返回一个key。
+ * 如果没有key则返回NULL。
+ */
 robj *dbRandomKey(redisDb *db) {
     dictEntry *de;
     int maxtries = 100;
@@ -286,6 +300,7 @@ robj *dbRandomKey(redisDb *db) {
         key = dictGetKey(de);
         keyobj = createStringObject(key,sdslen(key));
         if (dictFind(db->expires,key)) {
+        	//如果所有的key过期而且是slave并且达到最大尝试次数则返回一个过期的key
             if (allvolatile && server.masterhost && --maxtries == 0) {
                 /* If the DB is composed only of keys with an expire set,
                  * it could happen that all the keys are already logically
@@ -312,6 +327,7 @@ int dbSyncDelete(redisDb *db, robj *key) {
      * the key, because it is shared with the main dictionary. */
     if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);
     if (dictDelete(db->dict,key->ptr) == DICT_OK) {
+    	//集群更新
         if (server.cluster_enabled) slotToKeyDel(key);
         return 1;
     } else {
@@ -352,6 +368,10 @@ int dbDelete(redisDb *db, robj *key) {
  *
  * At this point the caller is ready to modify the object, for example
  * using an sdscat() call to append some data, or anything else.
+ */
+
+/**
+ * 返回一个未被共享的string对象
  */
 robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o) {
     serverAssert(o->type == OBJ_STRING);
@@ -494,6 +514,11 @@ void flushallCommand(client *c) {
     if (server.saveparamslen > 0) {
         /* Normally rdbSave() will reset dirty, but we don't want this here
          * as otherwise FLUSHALL will not be replicated nor put into the AOF. */
+
+    	/**
+    	 * 正常情况rdbSave()会重置dirty字段，但是我们在这里不想这么做
+    	 * 不然FLUSHALL命令不会被复制或者放入到AOF中。
+    	 */
         int saved_dirty = server.dirty;
         rdbSaveInfo rsi, *rsiptr;
         rsiptr = rdbPopulateSaveInfo(&rsi);
@@ -542,6 +567,9 @@ void existsCommand(client *c) {
     addReplyLongLong(c,count);
 }
 
+/**
+ * 选择数据库
+ */
 void selectCommand(client *c) {
     long id;
 
@@ -1190,6 +1218,10 @@ int keyIsExpired(redisDb *db, robj *key) {
      * may re-open the same key multiple times, can invalidate an already
      * open object in a next call, if the next call will see the key expired,
      * while the first did not. */
+
+    /**
+     * 避免像RPOPLPUSH类似命令打开一个key多次的情况，第一次key正常，第二次key已经过期
+     */
     else if (server.fixed_time_expire > 0) {
         now = server.mstime;
     }

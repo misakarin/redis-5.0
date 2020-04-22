@@ -50,15 +50,29 @@ size_t lazyfreeGetFreeEffort(robj *obj) {
  * If there are enough allocations to free the value object may be put into
  * a lazy free list instead of being freed synchronously. The lazy free list
  * will be reclaimed in a different bio.c thread. */
+
+/**
+ * 尝试从DB删除key,value和关联的过期项。
+ * 如果lazy free list有足够空间，则将value object放入而不是同步释放。
+ * lazy free list会在一个不同的bio.c线程中被回收。
+ */
 #define LAZYFREE_THRESHOLD 64
 int dbAsyncDelete(redisDb *db, robj *key) {
     /* Deleting an entry from the expires dict will not free the sds of
      * the key, because it is shared with the main dictionary. */
+
+	/**
+	 * 从expires dict中删除项不会释放key中sds，因为它还被用于主字典中。
+	 */
     if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);
 
     /* If the value is composed of a few allocations, to free in a lazy way
      * is actually just slower... So under a certain limit we just free
      * the object synchronously. */
+
+    /**
+     * 小空间则直接释放
+     */
     dictEntry *de = dictUnlink(db->dict,key->ptr);
     if (de) {
         robj *val = dictGetVal(de);
