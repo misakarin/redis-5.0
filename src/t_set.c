@@ -500,6 +500,12 @@ void spopWithCountCommand(client *c) {
      * creating a new set as we do this (that will be stored as the original
      * set). Then we return the elements left in the original set and
      * release it. */
+
+    	/**
+    	 * CASE 3：返回元素的数量非常大，接近set自身的大小。从这样的set中多次提取随机元素计算的
+    	 * 代价很大，所以我们使用不同的策略，我们创建一个新的set来保存随机提取我们不返回的元素。
+    	 * 然后返回原set中剩下的元素并释放set。
+    	 */
         robj *newset = NULL;
 
         /* Create a new set with just the remaining elements. */
@@ -801,6 +807,7 @@ void sinterGenericCommand(client *c, robj **setkeys,
     int encoding;
 
     for (j = 0; j < setnum; j++) {
+    	//SINTERSTORE时dstkey不为NULL
         robj *setobj = dstkey ?
             lookupKeyWrite(c->db,setkeys[j]) :
             lookupKeyRead(c->db,setkeys[j]);
@@ -825,6 +832,9 @@ void sinterGenericCommand(client *c, robj **setkeys,
     }
     /* Sort sets from the smallest to largest, this will improve our
      * algorithm's performance */
+    /**
+     * 从小的set开始遍历提高效率
+     */
     qsort(sets,setnum,sizeof(robj*),qsortCompareSetsByCardinality);
 
     /* The first thing we should output is the total number of elements...
@@ -846,6 +856,7 @@ void sinterGenericCommand(client *c, robj **setkeys,
     si = setTypeInitIterator(sets[0]);
     while((encoding = setTypeNext(si,&elesds,&intobj)) != -1) {
         for (j = 1; j < setnum; j++) {
+        	//跳过自己
             if (sets[j] == sets[0]) continue;
             if (encoding == OBJ_ENCODING_INTSET) {
                 /* intset with intset is simple... and fast */
@@ -916,10 +927,12 @@ void sinterGenericCommand(client *c, robj **setkeys,
     zfree(sets);
 }
 
+//SINTER key [key ...]
 void sinterCommand(client *c) {
     sinterGenericCommand(c,c->argv+1,c->argc-1,NULL);
 }
 
+//SINTERSTORE destination key [key ...]
 void sinterstoreCommand(client *c) {
     sinterGenericCommand(c,c->argv+2,c->argc-2,c->argv[1]);
 }
@@ -938,6 +951,7 @@ void sunionDiffGenericCommand(client *c, robj **setkeys, int setnum,
     int diff_algo = 1;
 
     for (j = 0; j < setnum; j++) {
+    	//sunionstoreCommand或sdiffstoreCommand时dstkey不为NULL
         robj *setobj = dstkey ?
             lookupKeyWrite(c->db,setkeys[j]) :
             lookupKeyRead(c->db,setkeys[j]);
