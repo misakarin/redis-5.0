@@ -662,6 +662,10 @@ void scanCallback(void *privdata, const dictEntry *de) {
  * if the cursor is valid, store it as unsigned integer into *cursor and
  * returns C_OK. Otherwise return C_ERR and send an error to the
  * client. */
+
+/**
+ * 解析SCAN命令的游标
+ */
 int parseScanCursorOrReply(client *c, robj *o, unsigned long *cursor) {
     char *eptr;
 
@@ -706,8 +710,15 @@ void scanGenericCommand(client *c, robj *o, unsigned long cursor) {
     i = (o == NULL) ? 2 : 3; /* Skip the key argument if needed. */
 
     /* Step 1: Parse options. */
+
+    /**
+     * 解析选项
+     */
     while (i < c->argc) {
         j = c->argc - i;
+        /**
+         * COUNT
+         */
         if (!strcasecmp(c->argv[i]->ptr, "count") && j >= 2) {
             if (getLongFromObjectOrReply(c, c->argv[i+1], &count, NULL)
                 != C_OK)
@@ -721,7 +732,11 @@ void scanGenericCommand(client *c, robj *o, unsigned long cursor) {
             }
 
             i += 2;
-        } else if (!strcasecmp(c->argv[i]->ptr, "match") && j >= 2) {
+        }
+        /**
+         * MATCH
+         */
+        else if (!strcasecmp(c->argv[i]->ptr, "match") && j >= 2) {
             pat = c->argv[i+1]->ptr;
             patlen = sdslen(pat);
 
@@ -745,6 +760,12 @@ void scanGenericCommand(client *c, robj *o, unsigned long cursor) {
      * cursor to zero to signal the end of the iteration. */
 
     /* Handle the case of a hash table. */
+
+    /**
+     * 遍历集合
+     *
+     * 如果对象是ziplist, intset或者是其它表示而不是hash table则返回整个对象
+     */
     ht = NULL;
     if (o == NULL) {
         ht = c->db->dict;
@@ -927,6 +948,13 @@ void shutdownCommand(client *c) {
      * with half-read data).
      *
      * Also when in Sentinel mode clear the SAVE flag and force NOSAVE. */
+
+    /**
+     * 当SHUTDOWN命令执行时服务器正在将数据集加载到内存我们要避免关闭时保存数据集（
+     * 否则读到一半的数据将覆盖当前数据库）
+     *
+     * 在哨兵节点也要清除SAVE标志位和强制执行NOSAVE命令。
+     */
     if (server.loading || server.sentinel_mode)
         flags = (flags & ~SHUTDOWN_SAVE) | SHUTDOWN_NOSAVE;
     if (prepareForShutdown(flags) == C_OK) exit(0);
@@ -998,6 +1026,7 @@ void moveCommand(client *c) {
     src = c->db;
     srcid = c->db->id;
 
+    //转换数字失败或数据库不存在
     if (getLongLongFromObject(c->argv[2],&dbid) == C_ERR ||
         dbid < INT_MIN || dbid > INT_MAX ||
         selectDb(c,dbid) == C_ERR)
@@ -1010,6 +1039,7 @@ void moveCommand(client *c) {
 
     /* If the user is moving using as target the same
      * DB as the source DB it is probably an error. */
+    //目标数据库与当前数据库相同
     if (src == dst) {
         addReply(c,shared.sameobjecterr);
         return;
@@ -1017,6 +1047,7 @@ void moveCommand(client *c) {
 
     /* Check if the element exists and get a reference */
     o = lookupKeyWrite(c->db,c->argv[1]);
+    //key不存在
     if (!o) {
         addReply(c,shared.czero);
         return;
@@ -1024,11 +1055,13 @@ void moveCommand(client *c) {
     expire = getExpire(c->db,c->argv[1]);
 
     /* Return zero if the key already exists in the target DB */
+    //目标对象存在相同key
     if (lookupKeyWrite(dst,c->argv[1]) != NULL) {
         addReply(c,shared.czero);
         return;
     }
     dbAdd(dst,c->argv[1],o);
+    //设置过期时间
     if (expire != -1) setExpire(c,dst,c->argv[1],expire);
     incrRefCount(o);
 
