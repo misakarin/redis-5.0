@@ -165,10 +165,15 @@ void rdbCheckSetupSignals(void) {
 
     sigemptyset(&act.sa_mask);
     act.sa_flags = SA_NODEFER | SA_RESETHAND | SA_SIGINFO;
+    //信号处理函数
     act.sa_sigaction = rdbCheckHandleCrash;
+    //无效的内存引用（段故障）
     sigaction(SIGSEGV, &act, NULL);
+    //总线异常
     sigaction(SIGBUS, &act, NULL);
+    //浮点异常
     sigaction(SIGFPE, &act, NULL);
+    //非法指令
     sigaction(SIGILL, &act, NULL);
 }
 
@@ -176,6 +181,9 @@ void rdbCheckSetupSignals(void) {
  * 1 is returned.
  * The file is specified as a filename in 'rdbfilename' if 'fp' is not NULL,
  * otherwise the already open file 'fp' is checked. */
+/**
+ * 检查指定的RDB文件。正常返回0，否则返回1。
+ */
 int redis_check_rdb(char *rdbfilename, FILE *fp) {
     uint64_t dbid;
     int type, rdbver;

@@ -987,6 +987,10 @@ void sunionDiffGenericCommand(client *c, robj **setkeys, int setnum,
 
         /* Algorithm 1 has better constant times and performs less operations
          * if there are elements in common. Give it some advantage. */
+
+        /**
+         * 如果有共同的元素，算法1有更好的运行时间并且执行更少的操作。让它优先级更高。
+         */
         algo_one_work /= 2;
         diff_algo = (algo_one_work <= algo_two_work) ? 1 : 2;
 
@@ -1026,6 +1030,12 @@ void sunionDiffGenericCommand(client *c, robj **setkeys, int setnum,
          *
          * This way we perform at max N*M operations, where N is the size of
          * the first set, and M the number of sets. */
+
+    	/**
+    	 * 通过遍历第一个集合的所有元素来执行diff命令，并且只往目标集合中添加在其他集合中都不存在的元素。
+    	 *
+    	 * 该方式执行N*M次操作，N是一个集合的大小，M是集合的数量。
+    	 */
         si = setTypeInitIterator(sets[0]);
         while((ele = setTypeNextObject(si)) != NULL) {
             for (j = 1; j < setnum; j++) {
@@ -1049,6 +1059,13 @@ void sunionDiffGenericCommand(client *c, robj **setkeys, int setnum,
          *
          * This is O(N) where N is the sum of all the elements in every
          * set. */
+
+    	/**
+    	 * 将第一个集合的所有元素添加到辅助集合中。
+    	 * 然后从它删除所有其它集合的所有元素。
+    	 *
+    	 * 时间复杂度是O(N)，N是所有集合元素的数量。
+    	 */
         for (j = 0; j < setnum; j++) {
             if (!sets[j]) continue; /* non existing keys are like empty sets */
 
