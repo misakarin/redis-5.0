@@ -222,6 +222,7 @@ int rdbLoadLenByRef(rio *rdb, int *isencoded, uint64_t *lenptr) {
     unsigned char buf[2];
     int type;
 
+    //指针不为NULL，值设为0
     if (isencoded) *isencoded = 0;
     if (rioRead(rdb,buf,1) == 0) return -1;
     type = (buf[0]&0xC0)>>6;
@@ -469,13 +470,18 @@ err:
  * representation of an integer value we try to save it in a special form */
 
 /**
- *
+ * 以[len][data]格式将一个字符串对象保存到硬盘。如果对象是一个字符串表示的整数尝试以特殊的格式保存。
  */
 ssize_t rdbSaveRawString(rio *rdb, unsigned char *s, size_t len) {
     int enclen;
     ssize_t n, nwritten = 0;
 
     /* Try integer encoding */
+
+    /**
+     * -2147483648 ~ 2147483647
+     * 11位
+     */
     if (len <= 11) {
         unsigned char buf[5];
         if ((enclen = rdbTryIntegerEncoding((char*)s,len,buf)) > 0) {
@@ -504,10 +510,17 @@ ssize_t rdbSaveRawString(rio *rdb, unsigned char *s, size_t len) {
 }
 
 /* Save a long long value as either an encoded string or a string. */
+
+/**
+ * 保存long long
+ */
 ssize_t rdbSaveLongLongAsStringObject(rio *rdb, long long value) {
     unsigned char buf[32];
     ssize_t n, nwritten = 0;
     int enclen = rdbEncodeInteger(value,buf);
+    /**
+     * 能否以integer保存
+     */
     if (enclen > 0) {
         return rdbWriteRaw(rdb,buf,enclen);
     } else {
@@ -546,6 +559,10 @@ ssize_t rdbSaveStringObject(rio *rdb, robj *obj) {
  * RDB_LOAD_SDS: Return an SDS string instead of a Redis object.
  *
  * On I/O error NULL is returned.
+ */
+
+/**
+ * 根据flags从RDB文件中返回字符串对象
  */
 void *rdbGenericLoadStringObject(rio *rdb, int flags, size_t *lenptr) {
     int encode = flags & RDB_LOAD_ENC;
@@ -607,6 +624,10 @@ robj *rdbLoadEncodedStringObject(rio *rdb) {
  * 254: + inf
  * 255: - inf
  */
+
+/**
+ * 保存double
+ */
 int rdbSaveDoubleValue(rio *rdb, double val) {
     unsigned char buf[128];
     int len;
@@ -642,6 +663,10 @@ int rdbSaveDoubleValue(rio *rdb, double val) {
 }
 
 /* For information about double serialization check rdbSaveDoubleValue() */
+
+/**
+ * 读取double
+ */
 int rdbLoadDoubleValue(rio *rdb, double *val) {
     char buf[256];
     unsigned char len;
@@ -664,6 +689,10 @@ int rdbLoadDoubleValue(rio *rdb, double *val) {
  * the value is copied verbatim from memory to disk.
  *
  * Return -1 on error, the size of the serialized value on success. */
+
+/**
+ * 为RDB 8或更高版本保存一个double，其中采用了IE754 binary64格式。
+ */
 int rdbSaveBinaryDoubleValue(rio *rdb, double val) {
     memrev64ifbe(&val);
     return rdbWriteRaw(rdb,&val,sizeof(val));
@@ -691,6 +720,10 @@ int rdbLoadBinaryFloatValue(rio *rdb, float *val) {
 }
 
 /* Save the object type of object "o". */
+
+/**
+ * 保存对象类型
+ */
 int rdbSaveObjectType(rio *rdb, robj *o) {
     switch (o->type) {
     case OBJ_STRING:
@@ -733,6 +766,10 @@ int rdbSaveObjectType(rio *rdb, robj *o) {
 
 /* Use rdbLoadType() to load a TYPE in RDB format, but returns -1 if the
  * type is not specifically a valid Object Type. */
+
+/**
+ * 读取对象类型
+ */
 int rdbLoadObjectType(rio *rdb) {
     int type;
     if ((type = rdbLoadType(rdb)) == -1) return -1;
