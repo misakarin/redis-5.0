@@ -48,6 +48,9 @@ extern int rdbCheckMode;
 void rdbCheckError(const char *fmt, ...);
 void rdbCheckSetError(const char *fmt, ...);
 
+/**
+ * 检查rdb文件然后退出
+ */
 void rdbCheckThenExit(int linenum, char *reason, ...) {
     va_list ap;
     char msg[1024];
@@ -69,6 +72,9 @@ void rdbCheckThenExit(int linenum, char *reason, ...) {
     exit(1);
 }
 
+/**
+ * 往rdb中写
+ */
 static int rdbWriteRaw(rio *rdb, void *p, size_t len) {
     if (rdb && rioWrite(rdb,p,len) == 0)
         return -1;
@@ -78,6 +84,9 @@ static int rdbWriteRaw(rio *rdb, void *p, size_t len) {
 /* This is just a wrapper for the low level function rioRead() that will
  * automatically abort if it is not possible to read the specified amount
  * of bytes. */
+/**
+ * 从rdb中读
+ */
 void rdbLoadRaw(rio *rdb, void *buf, uint64_t len) {
     if (rioRead(rdb,buf,len) == 0) {
         rdbExitReportCorruptRDB(
@@ -87,6 +96,9 @@ void rdbLoadRaw(rio *rdb, void *buf, uint64_t len) {
     }
 }
 
+/**
+ * 往rdb中写类型
+ */
 int rdbSaveType(rio *rdb, unsigned char type) {
     return rdbWriteRaw(rdb,&type,1);
 }
@@ -94,6 +106,11 @@ int rdbSaveType(rio *rdb, unsigned char type) {
 /* Load a "type" in RDB format, that is a one byte unsigned integer.
  * This function is not only used to load object types, but also special
  * "types" like the end-of-file type, the EXPIRE type, and so forth. */
+
+/**
+ * 从rdb中读“类型”，1字节的无符号整数。
+ * 该函数不仅仅用于读取对象类型，而且也读取像“end-of-file”类型，EXPIRE类型等特殊的类型。
+ */
 int rdbLoadType(rio *rdb) {
     unsigned char type;
     if (rioRead(rdb,&type,1) == 0) return -1;
@@ -103,12 +120,20 @@ int rdbLoadType(rio *rdb) {
 /* This is only used to load old databases stored with the RDB_OPCODE_EXPIRETIME
  * opcode. New versions of Redis store using the RDB_OPCODE_EXPIRETIME_MS
  * opcode. */
+
+/**
+ * 该函数仅用于从旧数据库中存储的RDB_OPCODE_EXPIRETIME操作码。新版本的数据库存储使用
+ * RDB_OPCODE_EXPIRETIME_MS操作码。
+ */
 time_t rdbLoadTime(rio *rdb) {
     int32_t t32;
     rdbLoadRaw(rdb,&t32,4);
     return (time_t)t32;
 }
 
+/**
+ * 保存毫秒时间
+ */
 int rdbSaveMillisecondTime(rio *rdb, long long t) {
     int64_t t64 = (int64_t) t;
     memrev64ifbe(&t64); /* Store in little endian. */
@@ -126,6 +151,10 @@ int rdbSaveMillisecondTime(rio *rdb, long long t) {
  * own old RDB files. Because of that, we instead fix the function only for new
  * RDB versions, and load older RDB versions as we used to do in the past,
  * allowing big endian systems to load their own old RDB files. */
+
+/**
+ * 读取毫秒时间
+ */
 long long rdbLoadMillisecondTime(rio *rdb, int rdbver) {
     int64_t t64;
     rdbLoadRaw(rdb,&t64,8);
@@ -137,6 +166,10 @@ long long rdbLoadMillisecondTime(rio *rdb, int rdbver) {
 /* Saves an encoded length. The first two bits in the first byte are used to
  * hold the encoding type. See the RDB_* definitions for more information
  * on the types of encoding. */
+
+/**
+ * 保存一个被编码的长度。第一个字节的前两位用于保存编码类型。
+ */
 int rdbSaveLen(rio *rdb, uint64_t len) {
     unsigned char buf[2];
     size_t nwritten;
@@ -180,6 +213,11 @@ int rdbSaveLen(rio *rdb, uint64_t len) {
  * encodings.
  *
  * The function returns -1 on error, 0 on success. */
+
+/**
+ * 读取一个编码的长度。如果读取的长度是由dbSaveLen()保存的正常的长度，则'*lenptr'被设置为
+ * 长度值。如果是特殊的长度则'*isencoded'被设置为1，编码的长度保存于'*lenptr'。
+ */
 int rdbLoadLenByRef(rio *rdb, int *isencoded, uint64_t *lenptr) {
     unsigned char buf[2];
     int type;
@@ -231,6 +269,10 @@ uint64_t rdbLoadLen(rio *rdb, int *isencoded) {
  * for encoded types. If the function successfully encodes the integer, the
  * representation is stored in the buffer pointer to by "enc" and the string
  * length is returned. Otherwise 0 is returned. */
+
+/**
+ * 编码整数值
+ */
 int rdbEncodeInteger(long long value, unsigned char *enc) {
     if (value >= -(1<<7) && value <= (1<<7)-1) {
         enc[0] = (RDB_ENCVAL<<6)|RDB_ENC_INT8;
@@ -256,9 +298,16 @@ int rdbEncodeInteger(long long value, unsigned char *enc) {
 /* Loads an integer-encoded object with the specified encoding type "enctype".
  * The returned value changes according to the flags, see
  * rdbGenerincLoadStringObject() for more info. */
+
+/**
+ * 以指定类型解码整数值
+ */
 void *rdbLoadIntegerObject(rio *rdb, int enctype, int flags, size_t *lenptr) {
+	//简单类型
     int plain = flags & RDB_LOAD_PLAIN;
+    //字符串类型
     int sds = flags & RDB_LOAD_SDS;
+    //编码类型
     int encode = flags & RDB_LOAD_ENC;
     unsigned char enc[4];
     long long val;
@@ -297,6 +346,9 @@ void *rdbLoadIntegerObject(rio *rdb, int enctype, int flags, size_t *lenptr) {
 /* String objects in the form "2391" "-100" without any space and with a
  * range of values that can fit in an 8, 16 or 32 bit signed value can be
  * encoded as integers to save space */
+/**
+ * 尝试将字符串进行整数编码
+ */
 int rdbTryIntegerEncoding(char *s, size_t len, unsigned char *enc) {
     long long value;
     char *endptr, buf[32];
@@ -313,6 +365,9 @@ int rdbTryIntegerEncoding(char *s, size_t len, unsigned char *enc) {
     return rdbEncodeInteger(value,enc);
 }
 
+/**
+ * 保存以lzf算法压缩的数据
+ */
 ssize_t rdbSaveLzfBlob(rio *rdb, void *data, size_t compress_len,
                        size_t original_len) {
     unsigned char byte;
@@ -320,15 +375,19 @@ ssize_t rdbSaveLzfBlob(rio *rdb, void *data, size_t compress_len,
 
     /* Data compressed! Let's save it on disk */
     byte = (RDB_ENCVAL<<6)|RDB_ENC_LZF;
+    //类型
     if ((n = rdbWriteRaw(rdb,&byte,1)) == -1) goto writeerr;
     nwritten += n;
 
+    //长度
     if ((n = rdbSaveLen(rdb,compress_len)) == -1) goto writeerr;
     nwritten += n;
 
+    //原始长度
     if ((n = rdbSaveLen(rdb,original_len)) == -1) goto writeerr;
     nwritten += n;
 
+    //压缩数据
     if ((n = rdbWriteRaw(rdb,data,compress_len)) == -1) goto writeerr;
     nwritten += n;
 
@@ -338,6 +397,9 @@ writeerr:
     return -1;
 }
 
+/**
+ *保存用lzf压缩的字符串对象
+ */
 ssize_t rdbSaveLzfStringObject(rio *rdb, unsigned char *s, size_t len) {
     size_t comprlen, outlen;
     void *out;
@@ -359,6 +421,9 @@ ssize_t rdbSaveLzfStringObject(rio *rdb, unsigned char *s, size_t len) {
 /* Load an LZF compressed string in RDB format. The returned value
  * changes according to 'flags'. For more info check the
  * rdbGenericLoadStringObject() function. */
+/**
+ * 读取用lzf压缩的字符串。返回值根据'flags'改变。
+ */
 void *rdbLoadLzfStringObject(rio *rdb, int flags, size_t *lenptr) {
     int plain = flags & RDB_LOAD_PLAIN;
     int sds = flags & RDB_LOAD_SDS;
@@ -402,6 +467,10 @@ err:
 
 /* Save a string object as [len][data] on disk. If the object is a string
  * representation of an integer value we try to save it in a special form */
+
+/**
+ *
+ */
 ssize_t rdbSaveRawString(rio *rdb, unsigned char *s, size_t len) {
     int enclen;
     ssize_t n, nwritten = 0;
