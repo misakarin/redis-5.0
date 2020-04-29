@@ -67,6 +67,10 @@ typedef struct aofrwblock {
 /* This function free the old AOF rewrite buffer if needed, and initialize
  * a fresh new one. It tests for server.aof_rewrite_buf_blocks equal to NULL
  * so can be used for the first initialization as well. */
+
+/**
+ * 重置AOF rewrite buffer
+ */
 void aofRewriteBufferReset(void) {
     if (server.aof_rewrite_buf_blocks)
         listRelease(server.aof_rewrite_buf_blocks);
@@ -76,6 +80,10 @@ void aofRewriteBufferReset(void) {
 }
 
 /* Return the current size of the AOF rewrite buffer. */
+
+/**
+ * 返回AOF rewrite buffer的大小
+ */
 unsigned long aofRewriteBufferSize(void) {
     listNode *ln;
     listIter li;
@@ -92,6 +100,10 @@ unsigned long aofRewriteBufferSize(void) {
 /* Event handler used to send data to the child process doing the AOF
  * rewrite. We send pieces of our AOF differences buffer so that the final
  * write when the child finishes the rewrite will be small. */
+
+/**
+ * 给执行AOF重写的子进程发送修改的数据
+ */
 void aofChildWriteDiffData(aeEventLoop *el, int fd, void *privdata, int mask) {
     listNode *ln;
     aofrwblock *block;
@@ -104,12 +116,16 @@ void aofChildWriteDiffData(aeEventLoop *el, int fd, void *privdata, int mask) {
     while(1) {
         ln = listFirst(server.aof_rewrite_buf_blocks);
         block = ln ? ln->value : NULL;
+        //处理完成从epoll事件中移除socket FD
         if (server.aof_stop_sending_diff || !block) {
             aeDeleteFileEvent(server.el,server.aof_pipe_write_data_to_child,
                               AE_WRITABLE);
             return;
         }
         if (block->used > 0) {
+        	/**
+        	 * 往子进程传输数据
+        	 */
             nwritten = write(server.aof_pipe_write_data_to_child,
                              block->buf,block->used);
             if (nwritten <= 0) return;
@@ -122,13 +138,23 @@ void aofChildWriteDiffData(aeEventLoop *el, int fd, void *privdata, int mask) {
 }
 
 /* Append data to the AOF rewrite buffer, allocating new blocks if needed. */
+
+/**
+ * 往AOF rewrite buffer添加数据，如果有需要分配新的block。
+ */
 void aofRewriteBufferAppend(unsigned char *s, unsigned long len) {
     listNode *ln = listLast(server.aof_rewrite_buf_blocks);
     aofrwblock *block = ln ? ln->value : NULL;
 
+    /**
+     * 有要添加的数据
+     */
     while(len) {
         /* If we already got at least an allocated block, try appending
          * at least some piece into it. */
+    	/**
+    	 * 尝试往最后一个block添加数据
+    	 */
         if (block) {
             unsigned long thislen = (block->free < len) ? block->free : len;
             if (thislen) {  /* The current block is not already full. */
@@ -140,6 +166,9 @@ void aofRewriteBufferAppend(unsigned char *s, unsigned long len) {
             }
         }
 
+        /**
+         * 还有剩余的数据，重新分配block
+         */
         if (len) { /* First block to allocate, or need another block. */
             int numblocks;
 
@@ -162,6 +191,9 @@ void aofRewriteBufferAppend(unsigned char *s, unsigned long len) {
 
     /* Install a file event to send data to the rewrite child if there is
      * not one already. */
+    /**
+     * 如果有需要创建一个事件
+     */
     if (aeGetFileEvents(server.el,server.aof_pipe_write_data_to_child) == 0) {
         aeCreateFileEvent(server.el, server.aof_pipe_write_data_to_child,
             AE_WRITABLE, aofChildWriteDiffData, NULL);
@@ -171,6 +203,10 @@ void aofRewriteBufferAppend(unsigned char *s, unsigned long len) {
 /* Write the buffer (possibly composed of multiple blocks) into the specified
  * fd. If a short write or any other error happens -1 is returned,
  * otherwise the number of bytes written is returned. */
+
+/**
+ * 将AOF rewrite buffer中数据写入指定文件
+ */
 ssize_t aofRewriteBufferWrite(int fd) {
     listNode *ln;
     listIter li;
@@ -199,17 +235,28 @@ ssize_t aofRewriteBufferWrite(int fd) {
 
 /* Return true if an AOf fsync is currently already in progress in a
  * BIO thread. */
+
+/**
+ *	如果AOf fsync当前已经在BIO线程中进行，则返回true。
+ */
 int aofFsyncInProgress(void) {
     return bioPendingJobsOfType(BIO_AOF_FSYNC) != 0;
 }
 
 /* Starts a background task that performs fsync() against the specified
  * file descriptor (the one of the AOF file) in another thread. */
+
+/**
+ * 创建线程执行fsync
+ */
 void aof_background_fsync(int fd) {
     bioCreateBackgroundJob(BIO_AOF_FSYNC,(void*)(long)fd,NULL,NULL);
 }
 
 /* Kills an AOFRW child process if exists */
+/**
+ * kill AOF rewrite 子进程
+ */
 static void killAppendOnlyChild(void) {
     int statloc;
     /* No AOFRW child? return. */
@@ -231,10 +278,19 @@ static void killAppendOnlyChild(void) {
 
 /* Called when the user switches from "appendonly yes" to "appendonly no"
  * at runtime using the CONFIG command. */
+/**
+ * 停止AOF
+ */
 void stopAppendOnly(void) {
     serverAssert(server.aof_state != AOF_OFF);
     flushAppendOnlyFile(1);
+    /**
+     * 写入磁盘
+     */
     redis_fsync(server.aof_fd);
+    /**
+     * 关闭AOF文件
+     */
     close(server.aof_fd);
 
     server.aof_fd = -1;
@@ -245,12 +301,18 @@ void stopAppendOnly(void) {
 
 /* Called when the user switches from "appendonly no" to "appendonly yes"
  * at runtime using the CONFIG command. */
+/**
+ * 启动AOF
+ */
 int startAppendOnly(void) {
     char cwd[MAXPATHLEN]; /* Current working dir path for error messages. */
     int newfd;
 
     newfd = open(server.aof_filename,O_WRONLY|O_APPEND|O_CREAT,0644);
     serverAssert(server.aof_state == AOF_OFF);
+    /**
+     * 创建AOF文件失败
+     */
     if (newfd == -1) {
         char *cwdp = getcwd(cwd,MAXPATHLEN);
 
@@ -262,7 +324,13 @@ int startAppendOnly(void) {
             strerror(errno));
         return C_ERR;
     }
+    /**
+     * 存在RDB的子进程
+     */
     if (server.rdb_child_pid != -1) {
+    	/**
+    	 * 排期AOF rewrite
+    	 */
         server.aof_rewrite_scheduled = 1;
         serverLog(LL_WARNING,"AOF was enabled but there is already a child process saving an RDB file on disk. An AOF background was scheduled to start when possible.");
     } else {
@@ -294,6 +362,9 @@ int startAppendOnly(void) {
  * is likely to fail. However apparently in modern systems this is no longer
  * true, and in general it looks just more resilient to retry the write. If
  * there is an actual error condition we'll get it at the next try. */
+/**
+ * 系统调用write的封装，用于尝试执行小的写入。
+ */
 ssize_t aofWrite(int fd, const char *buf, size_t len) {
     ssize_t nwritten = 0, totwritten = 0;
 
