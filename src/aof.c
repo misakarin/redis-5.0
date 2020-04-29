@@ -404,6 +404,10 @@ ssize_t aofWrite(int fd, const char *buf, size_t len) {
  *
  * However if force is set to 1 we'll write regardless of the background
  * fsync. */
+
+/**
+ * 将append only file buffer写入到磁盘
+ */
 #define AOF_WRITE_LOG_ERROR_RATE 30 /* Seconds between errors logging. */
 void flushAppendOnlyFile(int force) {
     ssize_t nwritten;
@@ -464,6 +468,10 @@ void flushAppendOnlyFile(int force) {
      * active, and when the above two conditions are missing.
      * We also use an additional event name to save all samples which is
      * useful for graphing / monitoring purposes. */
+
+    /**
+     * 记录延迟原因
+     */
     if (sync_in_progress) {
         latencyAddSampleIfNeeded("aof-write-pending-fsync",latency);
     } else if (server.aof_child_pid != -1 || server.rdb_child_pid != -1) {
@@ -586,6 +594,9 @@ try_fsync:
     }
 }
 
+/**
+ * 拼接命令到AOF
+ */
 sds catAppendOnlyGenericCommand(sds dst, int argc, robj **argv) {
     char buf[32];
     int len, j;
@@ -618,6 +629,10 @@ sds catAppendOnlyGenericCommand(sds dst, int argc, robj **argv) {
  * This command is used in order to translate EXPIRE and PEXPIRE commands
  * into PEXPIREAT command so that we retain precision in the append only
  * file, and the time is always absolute and not relative. */
+
+/**
+ * 拼接PEXPIREAT到AOF
+ */
 sds catAppendOnlyExpireAtCommand(sds buf, struct redisCommand *cmd, robj *key, robj *seconds) {
     long long when;
     robj *argv[3];
@@ -648,6 +663,9 @@ sds catAppendOnlyExpireAtCommand(sds buf, struct redisCommand *cmd, robj *key, r
     return buf;
 }
 
+/**
+ * 往AOF填充数据，转换各类有过期时间的命令
+ */
 void feedAppendOnlyFile(struct redisCommand *cmd, int dictid, robj **argv, int argc) {
     sds buf = sdsempty();
     robj *tmpargv[3];
@@ -708,6 +726,9 @@ void feedAppendOnlyFile(struct redisCommand *cmd, int dictid, robj **argv, int a
      * accumulate the differences between the child DB and the current one
      * in a buffer, so that when the child process will do its work we
      * can append the differences to the new append only file. */
+    /**
+     * AOF rewrite正在执行
+     */
     if (server.aof_child_pid != -1)
         aofRewriteBufferAppend((unsigned char*)buf,sdslen(buf));
 
@@ -720,6 +741,9 @@ void feedAppendOnlyFile(struct redisCommand *cmd, int dictid, robj **argv, int a
 
 /* In Redis commands are always executed in the context of a client, so in
  * order to load the append only file we need to create a fake client. */
+/**
+ * 创建用于加载AOF的假client
+ */
 struct client *createFakeClient(void) {
     struct client *c = zmalloc(sizeof(*c));
 
@@ -747,6 +771,9 @@ struct client *createFakeClient(void) {
     return c;
 }
 
+/**
+ * 释放参数
+ */
 void freeFakeClientArgv(struct client *c) {
     int j;
 
@@ -755,6 +782,9 @@ void freeFakeClientArgv(struct client *c) {
     zfree(c->argv);
 }
 
+/**
+ * 释放client
+ */
 void freeFakeClient(struct client *c) {
     sdsfree(c->querybuf);
     listRelease(c->reply);
@@ -766,6 +796,10 @@ void freeFakeClient(struct client *c) {
 /* Replay the append log file. On success C_OK is returned. On non fatal
  * error (the append only file is zero-length) C_ERR is returned. On
  * fatal error an error message is logged and the program exists. */
+
+/**
+ * 加载AOF
+ */
 int loadAppendOnlyFile(char *filename) {
     struct client *fakeClient;
     FILE *fp = fopen(filename,"r");
@@ -800,6 +834,10 @@ int loadAppendOnlyFile(char *filename) {
 
     /* Check if this AOF file has an RDB preamble. In that case we need to
      * load the RDB file and later continue loading the AOF tail. */
+
+    /**
+     * 判断AOF文件是否有RDB的序言
+     */
     char sig[5]; /* "REDIS" */
     if (fread(sig,1,5,fp) != 5 || memcmp(sig,"REDIS",5) != 0) {
         /* No RDB preamble, seek back at 0 offset. */
@@ -1355,6 +1393,10 @@ int rewriteModuleObject(rio *r, robj *key, robj *o) {
 /* This function is called by the child rewriting the AOF file to read
  * the difference accumulated from the parent into a buffer, that is
  * concatenated at the end of the rewrite. */
+
+/**
+ * 将执行AOF rewrite后执行的指令添加到AOF
+ */
 ssize_t aofReadDiffFromParent(void) {
     char buf[65536]; /* Default pipe buffer size on most Linux systems. */
     ssize_t nread, total = 0;
@@ -1367,6 +1409,9 @@ ssize_t aofReadDiffFromParent(void) {
     return total;
 }
 
+/**
+ * 遍历DB重写AOF
+ */
 int rewriteAppendOnlyFileRio(rio *aof) {
     dictIterator *di = NULL;
     dictEntry *de;
@@ -1449,6 +1494,10 @@ werr:
  * log Redis uses variadic commands when possible, such as RPUSH, SADD
  * and ZADD. However at max AOF_REWRITE_ITEMS_PER_CMD items per time
  * are inserted using a single command. */
+
+/**
+ * 重写AOF
+ */
 int rewriteAppendOnlyFile(char *filename) {
     rio aof;
     FILE *fp;
@@ -1467,6 +1516,9 @@ int rewriteAppendOnlyFile(char *filename) {
     server.aof_child_diff = sdsempty();
     rioInitWithFile(&aof,fp);
 
+    /**
+     * 自动fsync
+     */
     if (server.aof_rewrite_incremental_fsync)
         rioSetAutoSync(&aof,REDIS_AUTOSYNC_BYTES);
 

@@ -1161,6 +1161,10 @@ struct redisServer {
      * AOF文件当前选择的DB
      */
     int aof_selected_db; /* Currently selected DB in AOF */
+
+    /**
+     * 推迟AOF写入到磁盘的记录的开始时间
+     */
     time_t aof_flush_postponed_start; /* UNIX time of postponed AOF flush */
     /**
      * 最后写入AOF文件的时间
@@ -1175,6 +1179,9 @@ struct redisServer {
     int aof_last_write_status;      /* C_OK or C_ERR */
     int aof_last_write_errno;       /* Valid if aof_last_write_status is ERR */
     int aof_load_truncated;         /* Don't stop on unexpected AOF EOF. */
+    /**
+     * AOF重写中使用RDB作为前序
+     */
     int aof_use_rdb_preamble;       /* Use RDB preamble on AOF rewrites. */
     /* AOF pipes used to communicate between parent and child during rewrite. */
     int aof_pipe_write_data_to_child;
@@ -1326,6 +1333,9 @@ struct redisServer {
     mstime_t mstime;            /* 'unixtime' in milliseconds. */
     ustime_t ustime;            /* 'unixtime' in microseconds. */
     /* Pubsub */
+    /**
+     * 映射channel到订阅的client
+     */
     dict *pubsub_channels;  /* Map channels to list of subscribed clients */
     list *pubsub_patterns;  /* A list of pubsub_patterns */
     int notify_keyspace_events; /* Events to propagate via Pub/Sub. This is an
