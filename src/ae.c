@@ -281,6 +281,10 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
      * events to be processed ASAP when this happens: the idea is that
      * processing events earlier is less dangerous than delaying them
      * indefinitely, and practice suggests it is. */
+
+    /**
+     * 系统时间被设置成未来
+     */
     if (now < eventLoop->lastTime) {
         te = eventLoop->timeEventHead;
         while(te) {
